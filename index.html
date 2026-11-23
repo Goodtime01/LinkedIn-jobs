@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>No-Code & Automation Remote Jobs</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#16a34a">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div>
+        <h1>⚡ NoCodeCareers</h1>
+        <span class="badge-tagline">Remote & Dollar Jobs for Builders</span>
+      </div>
+      <a href="https://www.linkedin.com/in/etini-obop" target="_blank">Join LinkedIn</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- FEED SECTION -->
+    <section id="feed-section">
+      <div class="filter-scroll">
+        <button class="filter-btn active" data-category="All">All Roles</button>
+        <button class="filter-btn" data-category="No-Code">No-Code</button>
+        <button class="filter-btn" data-category="Automation">Automation</button>
+        <button class="filter-btn" data-category="AI Workflow">AI Workflow</button>
+        <button class="filter-btn" data-category="Virtual Assistant">Virtual Assistant</button>
+      </div>
+
+      <div class="jobs-list" id="jobs-container">
+        <!-- Injected dynamically by app.js -->
+      </div>
+    </section>
+
+    <!-- EMPLOYER POST FORM SECTION -->
+    <section id="form-section" class="form-view">
+      <div style="background:#fefce8; border:1px solid #facc15; padding:12px; border-radius:8px;">
+        <h3 style="font-size:0.9rem; color:#854d0e;">✨ Founding Employer Perks Active</h3>
+        <p style="font-size:0.75rem; color:#713f12; margin-top:2px;">
+          Next 10 employers get: <strong>2x Logo Size + Yellow Highlight + LinkedIn Post</strong> for free.
+        </p>
+        <div id="linkedin-post-quota-status" class="badge-counter">Checking LinkedIn post quota...</div>
+      </div>
+
+      <form id="employer-post-form">
+        <div class="form-group">
+          <label for="company-name">Company Name</label>
+          <input type="text" id="company-name" required placeholder="e.g. Acme Automation">
+        </div>
+
+        <div class="form-group">
+          <label for="job-title">Job Title</label>
+          <input type="text" id="job-title" required placeholder="e.g. Senior Make.com Builder">
+        </div>
+
+        <div class="form-group">
+          <label for="job-category">Category</label>
+          <select id="job-category">
+            <option value="Automation">Automation</option>
+            <option value="No-Code">No-Code</option>
+            <option value="AI Workflow">AI Workflow</option>
+            <option value="Virtual Assistant">Virtual Assistant</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="salary-usd">Monthly Salary (USD)</label>
+          <input type="number" id="salary-usd" required placeholder="e.g. 2500">
+        </div>
+
+        <div class="form-group">
+          <label for="apply-url">Original Application Link</label>
+          <input type="url" id="apply-url" required placeholder="https://yourcompany.com/jobs/apply">
+        </div>
+
+        <div class="form-group">
+          <label for="fit-summary">Why this fits you (2-line summary)</label>
+          <textarea id="fit-summary" rows="3" required placeholder="State key tools and who should apply..."></textarea>
+        </div>
+
+        <button type="submit" class="btn-apply" style="border:none; margin-top:8px; cursor:pointer;">
+          Submit Founding Post (Free)
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="job-modal">
+    <div class="modal-content" id="modal-details"></div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="feed">
+      <span style="font-size:1.2rem;">💼</span>
+      <span>Jobs</span>
+    </button>
+    <button class="nav-item" data-tab="saved">
+      <span style="font-size:1.2rem;">★</span>
+      <span>Saved</span>
+    </button>
+    <button class="nav-item" data-tab="post">
+      <span style="font-size:1.2rem;">➕</span>
+      <span>Post Role</span>
+    </button>
+  </nav>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
