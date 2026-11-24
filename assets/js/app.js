@@ -240,7 +240,7 @@ function setupFormListener() {
   const form = document.getElementById('employer-post-form');
   
   // 🔴 1. PASTE YOUR PAYSTACK LIVE PUBLIC KEY HERE (Starts with pk_live_...)
-  const PAYSTACK_PUBLIC_KEY = "pk_live_YOUR_PAYSTACK_KEY_HERE";
+  const PAYSTACK_PUBLIC_KEY = "pk_live_c70a3f5403ab816952f6bcd3b7243dc3bafb4318";
   
   // 🔴 2. PASTE YOUR FORMSPREE URL HERE
   const FORMSPREE_URL = "https://formspree.io/f/YOUR_ID_HERE";
