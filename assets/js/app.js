@@ -1,11 +1,12 @@
 import { INITIAL_JOBS, formatSalaryNaira } from './jobs.js';
-import { toggleSaveJob, getSavedJobs, checkLinkedInPostQuota, markLinkedInPostUsed } from './storage.js';
+import { toggleSaveJob, getSavedJobs } from './storage.js';
 import { fetchLiveJobs } from './fetch.js';
 
 let allJobs = [...INITIAL_JOBS];
 let activeFilter = 'All';
 let currentTab = 'feed';
 
+// Register Service Worker for Offline browsing
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(console.error);
@@ -18,10 +19,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavListeners();
   setupFormListener();
 
-  // Fetch live jobs in the background without freezing the UI
+  // Load live jobs in the background
   const liveJobs = await fetchLiveJobs();
   if (liveJobs && liveJobs.length > 0) {
-    // Avoid duplicates
     const existingIds = new Set(allJobs.map(j => j.id));
     const uniqueLiveJobs = liveJobs.filter(j => !existingIds.has(j.id));
     
@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// Render cards to the screen
 async function renderJobs() {
   const container = document.getElementById('jobs-container');
   const savedJobs = await getSavedJobs();
@@ -84,6 +85,7 @@ async function renderJobs() {
     `;
   }).join('');
 
+  // Click card to open modal
   container.querySelectorAll('.job-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.btn-save')) return;
@@ -91,6 +93,7 @@ async function renderJobs() {
     });
   });
 
+  // Click bookmark button
   container.querySelectorAll('.btn-save').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -102,8 +105,58 @@ async function renderJobs() {
       }
     });
   });
+
+  // 🔴 INJECT GOOGLE JOB SCHEMA INTO THE HEAD
+  injectGoogleJobSchema(list);
 }
 
+// Invisible Google Jobs SEO Tag
+function injectGoogleJobSchema(jobList) {
+  const oldScript = document.getElementById('google-job-schema');
+  if (oldScript) oldScript.remove();
+
+  const schemaData = jobList.map(job => ({
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    "title": job.title,
+    "description": job.fit_summary,
+    "identifier": {
+      "@type": "PropertyValue",
+      "name": job.company_name,
+      "value": job.id
+    },
+    "datePosted": new Date().toISOString().slice(0, 10),
+    "validThrough": new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    "employmentType": "FULL_TIME",
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": job.company_name,
+      "logo": job.company_logo
+    },
+    "jobLocationType": "TELECOMMUTE",
+    "applicantLocationRequirements": {
+      "@type": "Country",
+      "name": "Worldwide"
+    },
+    "baseSalary": {
+      "@type": "MonetaryAmount",
+      "currency": "USD",
+      "value": {
+        "@type": "QuantitativeValue",
+        "value": job.salary_usd,
+        "unitText": "MONTH"
+      }
+    }
+  }));
+
+  const script = document.createElement('script');
+  script.id = 'google-job-schema';
+  script.type = 'application/ld+json';
+  script.textContent = JSON.stringify(schemaData);
+  document.head.appendChild(script);
+}
+
+// Modal view
 function openJobModal(id) {
   const job = allJobs.find(j => j.id === id);
   if (!job) return;
@@ -145,6 +198,7 @@ function openJobModal(id) {
   document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('active'));
 }
 
+// Filters
 function setupFilterListeners() {
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -156,6 +210,7 @@ function setupFilterListeners() {
   });
 }
 
+// Bottom Navigation
 function setupNavListeners() {
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -171,7 +226,6 @@ function setupNavListeners() {
       if (targetTab === 'post') {
         feedContainer.style.display = 'none';
         formContainer.style.display = 'flex';
-        updateLinkedInPostQuotaUI();
       } else {
         feedContainer.style.display = 'block';
         formContainer.style.display = 'none';
@@ -181,18 +235,7 @@ function setupNavListeners() {
   });
 }
 
-function updateLinkedInPostQuotaUI() {
-  const isUsed = checkLinkedInPostQuota();
-  const counterEl = document.getElementById('linkedin-post-quota-status');
-  if (isUsed) {
-    counterEl.innerText = "1/1 LinkedIn Post Used Today (Resets 7am tomorrow)";
-    counterEl.style.color = "#dc2626";
-  } else {
-    counterEl.innerText = "0/1 LinkedIn Post Used Today (Available for this post)";
-    counterEl.style.color = "#16a34a";
-  }
-}
-
+// Handle Founding Employer Post Job
 function setupFormListener() {
   const form = document.getElementById('employer-post-form');
   form.addEventListener('submit', (e) => {
@@ -222,13 +265,7 @@ function setupFormListener() {
     };
 
     allJobs.unshift(newJob);
-
-    if (!checkLinkedInPostQuota()) {
-      markLinkedInPostUsed();
-      alert("Success! Your job is posted with Founding Employer perks and added to today's LinkedIn post queue!");
-    } else {
-      alert("Success! Your job is posted with Founding Employer perks. (Today's LinkedIn post quota is already full).");
-    }
+    alert("Success! Your job is posted with Founding Employer perks (Yellow highlight + 2x Logo).");
 
     form.reset();
     document.querySelector('.nav-item[data-tab="feed"]').click();
