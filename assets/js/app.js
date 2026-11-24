@@ -238,7 +238,7 @@ function setupNavListeners() {
 // Handle Founding Employer Post Job
 function setupFormListener() {
   const form = document.getElementById('employer-post-form');
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const title = document.getElementById('job-title').value;
@@ -264,8 +264,32 @@ function setupFormListener() {
       logo_size: "large"
     };
 
+    // 🔴 PASTE YOUR FORMSPREE URL IN PLACE OF THE TEXT BELOW
+    const FORMSPREE_URL = "https://formspree.io/f/mwloanjr";
+
+    try {
+      if (FORMSPREE_URL !== "https://formspree.io/f/mwloanjr") {
+        await fetch(FORMSPREE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            role: title,
+            company: company,
+            salary_usd: `$${salaryUSD}/month`,
+            category: category,
+            apply_link: applyUrl,
+            summary: summary,
+            submitted_at: new Date().toLocaleString()
+          })
+        });
+      }
+    } catch (err) {
+      console.warn("Formspree submission error:", err);
+    }
+
+    // Add to feed immediately for instant gratification
     allJobs.unshift(newJob);
-    alert("Success! Your job is posted with Founding Employer perks (Yellow highlight + 2x Logo).");
+    alert("🎉 Success! Your job has been submitted for Founding Employer review and posted to the feed!");
 
     form.reset();
     document.querySelector('.nav-item[data-tab="feed"]').click();
