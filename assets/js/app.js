@@ -235,63 +235,112 @@ function setupNavListeners() {
   });
 }
 
-// Handle Founding Employer Post Job
+// Handle Employer Post Job with Paystack Live Integration
 function setupFormListener() {
   const form = document.getElementById('employer-post-form');
+  
+  // 🔴 1. PASTE YOUR PAYSTACK LIVE PUBLIC KEY HERE (Starts with pk_live_...)
+  const PAYSTACK_PUBLIC_KEY = "pk_live_YOUR_PAYSTACK_KEY_HERE";
+  
+  // 🔴 2. PASTE YOUR FORMSPREE URL HERE
+  const FORMSPREE_URL = "https://formspree.io/f/YOUR_ID_HERE";
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const title = document.getElementById('job-title').value;
     const company = document.getElementById('company-name').value;
+    const email = document.getElementById('employer-email').value;
     const salaryUSD = parseInt(document.getElementById('salary-usd').value, 10);
     const category = document.getElementById('job-category').value;
     const applyUrl = document.getElementById('apply-url').value;
     const summary = document.getElementById('fit-summary').value;
+    const tier = document.getElementById('listing-tier').value;
 
-    const newJob = {
-      id: `custom-${Date.now()}`,
-      title: title,
-      company_name: company,
-      company_logo: "https://dummyimage.com/100x100/16a34a/fff&text=★",
-      category: category,
-      type: "Remote",
-      salary_usd: salaryUSD,
-      salary_text: `$${salaryUSD.toLocaleString()}/month`,
-      fit_summary: summary,
-      source_name: company,
-      source_url: applyUrl,
-      is_founding: true,
-      logo_size: "large"
+    const isFeatured = (tier === 'featured');
+
+    // Function to finish publishing the job to feed & email
+    const finalizeJobPost = async (payRef = "Free_Listing") => {
+      const newJob = {
+        id: `custom-${Date.now()}`,
+        title: title,
+        company_name: company,
+        company_logo: "https://dummyimage.com/100x100/16a34a/fff&text=★",
+        category: category,
+        type: "Remote",
+        salary_usd: salaryUSD,
+        salary_text: `$${salaryUSD.toLocaleString()}/month`,
+        fit_summary: summary,
+        source_name: company,
+        source_url: applyUrl,
+        is_founding: isFeatured,
+        logo_size: isFeatured ? "large" : "standard"
+      };
+
+      try {
+        if (FORMSPREE_URL && !FORMSPREE_URL.includes("YOUR_ID_HERE")) {
+          await fetch(FORMSPREE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              role: title,
+              company: company,
+              employer_email: email,
+              tier: isFeatured ? "⭐ Featured (Paid ₦25,000)" : "Standard (Free)",
+              payment_reference: payRef,
+              salary_usd: `$${salaryUSD}/month`,
+              category: category,
+              apply_link: applyUrl,
+              summary: summary,
+              submitted_at: new Date().toLocaleString()
+            })
+          });
+        }
+      } catch (err) {
+        console.warn("Notification error:", err);
+      }
+
+      allJobs.unshift(newJob);
+      alert(isFeatured 
+        ? "🎉 Payment Successful! Your job is now live with Featured perks (Yellow Highlight + 2x Logo)!" 
+        : "Success! Your standard role has been submitted and added to the feed!");
+
+      form.reset();
+      document.querySelector('.nav-item[data-tab="feed"]').click();
     };
 
-    // 🔴 PASTE YOUR FORMSPREE URL IN PLACE OF THE TEXT BELOW
-    const FORMSPREE_URL = "https://formspree.io/f/mwloanjr";
-
-    try {
-      if (FORMSPREE_URL !== "https://formspree.io/f/mwloanjr") {
-        await fetch(FORMSPREE_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            role: title,
-            company: company,
-            salary_usd: `$${salaryUSD}/month`,
-            category: category,
-            apply_link: applyUrl,
-            summary: summary,
-            submitted_at: new Date().toLocaleString()
-          })
-        });
+    // If Featured Tier is selected, trigger Paystack checkout popup
+    if (isFeatured) {
+      if (!window.PaystackPop) {
+        alert("Paystack could not load. Please check your internet connection.");
+        return;
       }
-    } catch (err) {
-      console.warn("Formspree submission error:", err);
+
+      const handler = PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: email,
+        amount: 25000 * 100, // ₦25,000 in Kobo
+        currency: 'NGN',
+        ref: 'NCJ_' + Math.floor((Math.random() * 1000000000) + 1),
+        metadata: {
+          custom_fields: [
+            { display_name: "Job Title", variable_name: "job_title", value: title },
+            { display_name: "Company", variable_name: "company_name", value: company }
+          ]
+        },
+        callback: function(response) {
+          // Payment confirmed by Paystack!
+          finalizeJobPost(response.reference);
+        },
+        onClose: function() {
+          alert("Payment was cancelled. Your job has not been posted.");
+        }
+      });
+
+      handler.openIframe();
+    } else {
+      // Standard free post
+      finalizeJobPost();
     }
-
-    // Add to feed immediately for instant gratification
-    allJobs.unshift(newJob);
-    alert("🎉 Success! Your job has been submitted for Founding Employer review and posted to the feed!");
-
-    form.reset();
-    document.querySelector('.nav-item[data-tab="feed"]').click();
   });
 }
