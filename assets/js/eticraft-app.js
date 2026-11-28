@@ -398,37 +398,47 @@ document.addEventListener('DOMContentLoaded', () => {
   renderUserAuthState();
 });
 
+// --- SIGN IN CONTROLLER (GOOGLE + EMAIL) ---
 function initAuth() {
-  const triggerBtn = document.getElementById('auth-trigger-btn');
   const modal = document.getElementById('auth-modal');
   const closeBtn = document.getElementById('close-auth-btn');
   const emailForm = document.getElementById('email-auth-form');
   const googleBtn = document.getElementById('google-auth-btn');
 
-  if (triggerBtn && modal) triggerBtn.addEventListener('click', () => modal.classList.remove('hidden'));
-  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  }
 
+  // 1. Sign In with Email
   if (emailForm) {
     emailForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const email = document.getElementById('auth-email-input').value.trim();
+      const emailInput = document.getElementById('auth-email-input');
+      const email = emailInput ? emailInput.value.trim() : '';
+
       if (email) {
         const profile = { name: email.split('@')[0], email: email, provider: 'email' };
         localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
-        modal.classList.add('hidden');
+        if (modal) modal.classList.add('hidden');
+        if (emailInput) emailInput.value = '';
         renderUserAuthState();
         alert(`Welcome, ${profile.name}! You are signed in.`);
       }
     });
   }
 
+  // 2. Sign In with Google
   if (googleBtn) {
     googleBtn.addEventListener('click', () => {
       const email = prompt("Enter your Google Account email (e.g. user@gmail.com):");
       if (email && email.includes('@')) {
-        const profile = { name: email.split('@')[0].toUpperCase(), email: email, provider: 'google' };
+        const profile = {
+          name: email.split('@')[0].toUpperCase(),
+          email: email,
+          provider: 'google'
+        };
         localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
-        modal.classList.add('hidden');
+        if (modal) modal.classList.add('hidden');
         renderUserAuthState();
         alert(`Signed in with Google as ${profile.name}!`);
       }
@@ -436,24 +446,51 @@ function initAuth() {
   }
 }
 
+
+// --- DYNAMIC HEADER: SWITCHES BETWEEN 'SIGN IN' AND 'SIGN OUT' ---
 function renderUserAuthState() {
   const user = getUser();
   const authContainer = document.getElementById('auth-container');
   const trialsBadge = document.getElementById('trials-remaining');
 
-  if (trialsBadge) trialsBadge.innerText = isSubscribed() ? "∞" : getTrialsRemaining();
+  if (trialsBadge) {
+    trialsBadge.innerText = isSubscribed() ? "∞" : getTrialsRemaining();
+  }
 
-  if (user && authContainer) {
+  if (!authContainer) return;
+
+  // 1. IF SIGNED IN: Show Name + Red 'Sign Out' Button
+  if (user) {
     authContainer.innerHTML = `
       <div class="flex items-center space-x-2">
         <span class="text-xs font-semibold text-slate-800">👤 ${user.name}</span>
-        <button id="signout-btn" class="text-[11px] text-rose-500 hover:text-rose-700 underline font-medium">Sign out</button>
+        <button id="signout-btn" class="text-xs bg-rose-50 text-rose-600 border border-rose-200 font-semibold px-2.5 py-1 rounded-md hover:bg-rose-100 transition cursor-pointer">
+          Sign Out
+        </button>
       </div>
     `;
+
     document.getElementById('signout-btn').addEventListener('click', () => {
       localStorage.removeItem('eticraft_user_profile');
-      renderUserAuthState();
+      renderUserAuthState(); // Instantly returns to the Sign In button
+      alert("You have successfully signed out.");
     });
+  } 
+  // 2. IF SIGNED OUT: Show the Black 'Sign In' Button
+  else {
+    authContainer.innerHTML = `
+      <button id="auth-trigger-btn" class="text-xs bg-slate-900 text-white font-medium px-3.5 py-2 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+        Sign In
+      </button>
+    `;
+
+    const triggerBtn = document.getElementById('auth-trigger-btn');
+    const modal = document.getElementById('auth-modal');
+    if (triggerBtn && modal) {
+      triggerBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+      });
+    }
   }
 }
 
