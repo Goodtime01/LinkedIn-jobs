@@ -1,6 +1,9 @@
-// =========================================================
-// ETI-CRAFT ALL-IN-ONE ENGINE: CRASH-PROOF BUNDLE
-// =========================================================
+// ==========================================
+// ETI-CRAFT ENGINE: PART 1 (STATE & CLEANER)
+// ==========================================
+
+const PAYSTACK_PUBLIC_KEY = "pk_live_YOUR_PAYSTACK_KEY_HERE";
+const MAX_FREE_TRIALS = 5;
 
 const HARD_SKILLS = [
   "zapier", "make.com", "integromat", "airtable", "n8n", "hubspot", "webhooks",
@@ -40,7 +43,6 @@ const STOP_WORDS = new Set([
 let currentMode = 'tailor';
 let activeSection = 'skills';
 let lastExtractedKeywords = null;
-const MAX_FREE_TRIALS = 5;
 
 const getUser = () => {
   try { return JSON.parse(localStorage.getItem('eticraft_user_profile')); } catch (e) { return null; }
@@ -59,7 +61,6 @@ const consumeTrial = () => {
   return true;
 };
 
-// --- FIXES PDF LETTER-STUTTER / REPEATED CHARACTERS ---
 function cleanExtractedText(raw) {
   if (!raw) return "";
   let text = raw.replace(/https?:\/\/[^\s]+/gi, ' ');
@@ -89,27 +90,70 @@ function extractNGrams(text) {
   return ngrams;
 }
 
-// --- SECTION PARSER: EXTRACTS REAL NAME, CONTACT & SECTIONS ---
+// ==========================================
+// ETI-CRAFT ENGINE: PART 2 (EXTRACT & PARSE)
+// ==========================================
+
+function extractCandidateDetails(rawText) {
+  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+  let name = "";
+  let email = "";
+  let phone = "";
+  let location = "";
+  let linkedin = "";
+
+  const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) email = emailMatch[0];
+
+  const phoneMatch = rawText.match(/(\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\b0[789][01]\d{8}\b/);
+  if (phoneMatch) phone = phoneMatch[0];
+
+  const linkedinMatch = rawText.match(/(linkedin\.com\/in\/[a-zA-Z0-9_-]+)/i);
+  if (linkedinMatch) linkedin = linkedinMatch[0];
+
+  for (let line of lines) {
+    const cleanLine = line.replace(/[^a-zA-Z\s]/g, '').trim();
+    const lower = line.toLowerCase();
+    if (
+      cleanLine.length > 2 && cleanLine.length < 35 &&
+      !lower.includes('curriculum') && !lower.includes('vitae') &&
+      !lower.includes('resume') && !lower.includes('@') &&
+      !lower.includes('http') && !lower.includes('phone') &&
+      !lower.includes('address')
+    ) {
+      name = cleanLine.toUpperCase();
+      break;
+    }
+  }
+
+  const user = getUser();
+  if ((!name || name.length < 3) && user && user.name) {
+    name = user.name.toUpperCase();
+  }
+  if (!name) name = "ETINI OBOP";
+
+  for (let line of lines) {
+    const lower = line.toLowerCase();
+    if (lower.includes('nigeria') || lower.includes('lagos') || lower.includes('remote') || lower.includes('state') || lower.includes('estate') || lower.includes('road')) {
+      location = line.replace(/[|•]/g, '').trim();
+      break;
+    }
+  }
+  if (!location) location = "Lagos, Nigeria (Remote)";
+
+  return { name, email, phone, location, linkedin };
+}
+
 function parseResumeSections(rawText) {
   const clean = cleanExtractedText(rawText);
-  const sections = {
-    name: "",
-    contact: "",
-    summary: "",
-    skills: "",
-    experience: "",
-    education: ""
-  };
-
+  const sections = { name: "", contact: "", summary: "", skills: "", experience: "", education: "" };
   const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return sections;
 
-  // Real Name
   if (lines[0] && lines[0].length < 40) {
     sections.name = lines[0].replace(/[^a-zA-Z\s]/g, '').trim().toUpperCase();
   }
 
-  // Real Contact Info
   const contactLines = [];
   for (let i = 1; i < Math.min(lines.length, 5); i++) {
     const l = lines[i];
@@ -119,7 +163,6 @@ function parseResumeSections(rawText) {
   }
   sections.contact = contactLines.join(' | ') || "Remote | Email Verified | LinkedIn Profile";
 
-  // Sections
   let currentSec = 'summary';
   const patterns = {
     summary: /^(professional\s+)?summary|profile|about\s+me/i,
@@ -142,11 +185,9 @@ function parseResumeSections(rawText) {
       sections[currentSec] += line + "\n";
     }
   }
-
   return sections;
 }
 
-// --- FILE UPLOADER (PDF, DOCX, TXT, OCR) ---
 async function processUploadedFile(file, onProgress) {
   const fileName = file.name.toLowerCase();
 
@@ -196,6 +237,10 @@ async function processUploadedFile(file, onProgress) {
   throw new Error("Unsupported format. Please upload PDF, Word (.docx), or Image.");
 }
 
+
+// ==========================================
+// ETI-CRAFT ENGINE: PART 3 (TAILORING)
+// ==========================================
 
 function extractJobKeywords(jobText) {
   const clean = cleanExtractedText(jobText);
@@ -253,67 +298,6 @@ function calculateMatch(jobKeywords, resumeText) {
   };
 }
 
-
-
-// --- EXTRACTS CANDIDATE'S REAL NAME & CONTACT (ZERO MANUAL EDITING) ---
-function extractCandidateDetails(rawText) {
-  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-  let name = "";
-  let email = "";
-  let phone = "";
-  let location = "";
-  let linkedin = "";
-
-  // 1. Extract Real Email
-  const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-  if (emailMatch) email = emailMatch[0];
-
-  // 2. Extract Real Phone Number
-  const phoneMatch = rawText.match(/(\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\b0[789][01]\d{8}\b/);
-  if (phoneMatch) phone = phoneMatch[0];
-
-  // 3. Extract Real LinkedIn Profile
-  const linkedinMatch = rawText.match(/(linkedin\.com\/in\/[a-zA-Z0-9_-]+)/i);
-  if (linkedinMatch) linkedin = linkedinMatch[0];
-
-  // 4. Extract Real Candidate Name (First clean line that isn't a heading or contact info)
-  for (let line of lines) {
-    const cleanLine = line.replace(/[^a-zA-Z\s]/g, '').trim();
-    const lower = line.toLowerCase();
-    if (
-      cleanLine.length > 2 && cleanLine.length < 35 &&
-      !lower.includes('curriculum') && !lower.includes('vitae') &&
-      !lower.includes('resume') && !lower.includes('@') &&
-      !lower.includes('http') && !lower.includes('phone') &&
-      !lower.includes('address')
-    ) {
-      name = cleanLine.toUpperCase();
-      break;
-    }
-  }
-
-  // Fallback to logged-in user profile name if detected
-  const user = getUser();
-  if ((!name || name.length < 3) && user && user.name) {
-    name = user.name.toUpperCase();
-  }
-  if (!name) name = "ETINI OBOP";
-
-  // 5. Extract Real Location
-  for (let line of lines) {
-    const lower = line.toLowerCase();
-    if (lower.includes('nigeria') || lower.includes('lagos') || lower.includes('remote') || lower.includes('state') || lower.includes('estate') || lower.includes('road')) {
-      location = line.replace(/[|•]/g, '').trim();
-      break;
-    }
-  }
-  if (!location) location = "Lagos, Nigeria (Remote)";
-
-  return { name, email, phone, location, linkedin };
-}
-
-
-// --- 🪄 100% SUBMISSION-READY TAILORING ENGINE ---
 function tailorCVToFitDescription() {
   const jd = document.getElementById('job-description-input').value.trim();
   const resume = document.getElementById('resume-input').value.trim();
@@ -323,11 +307,9 @@ function tailorCVToFitDescription() {
     return;
   }
 
-  // 1. Extract Candidate's REAL Details from their uploaded CV
   const candidate = extractCandidateDetails(resume);
   const parsedCV = parseResumeSections(resume);
 
-  // 2. Extract Keywords, Action Verbs, and Target Title from Job Description
   const keywords = extractJobKeywords(jd);
   const topHardSkills = keywords.hardSkills.slice(0, 6);
   const topVerbs = keywords.actionVerbs.length >= 3 ? keywords.actionVerbs : ["engineered", "streamlined", "orchestrated", "automated"];
@@ -336,27 +318,22 @@ function tailorCVToFitDescription() {
   const firstLine = jd.split('\n')[0].replace(/[^a-zA-Z0-9\s]/g, '').trim();
   const targetTitle = firstLine.length < 40 && firstLine.length > 5 ? firstLine : "Workflow & Technology Specialist";
 
-  // 3. Format Candidate Name & Contact Bar (Clean, no placeholders!)
   const contactParts = [candidate.location];
   if (candidate.phone) contactParts.push(candidate.phone);
   if (candidate.email) contactParts.push(candidate.email);
   if (candidate.linkedin) contactParts.push(candidate.linkedin);
   const cleanContactBar = contactParts.join(' | ');
 
-  // 4. Synthesize Tailored Professional Summary
   const skillsList = topHardSkills.length ? topHardSkills.join(', ') : "process automation, workflow architecture, and API integration";
   const tailoredSummary = `Results-oriented ${targetTitle} with proven expertise in ${skillsList}. Demonstrates a proven track record of bridging technical execution with business operations, specializing in end-to-end workflow design, system optimization, and high-impact digital problem-solving. Committed to delivering scalable, high-efficiency solutions tailored to organizational objectives.`;
 
-  // 5. Structure Skills Section into Clear Professional Categories
   const coreTech = topHardSkills.length ? topHardSkills.map(s => s.toUpperCase()).join(' • ') : "ZAPIER • MAKE.COM • AIRTABLE • REST APIS";
   const softCompetencies = keywords.softSkills.length ? keywords.softSkills.join(' • ') : "Cross-Functional Leadership • Agile Execution • Troubleshooting • Process Optimization";
   const tailoredSkills = `• Core Technical Stack: ${coreTech}\n• Functional Competencies: System Architecture, Workflow Automation, Webhook Engineering, Database Modeling\n• Operational & Soft Skills: ${softCompetencies}`;
 
-  // 6. Build Experience Bullets with Real Dates and Target Keywords
   const verb1 = (topVerbs[0] || "Engineered").toUpperCase();
   const verb2 = (topVerbs[1] || "Automated").toUpperCase();
   const verb3 = (topVerbs[2] || "Streamlined").toUpperCase();
-
   const skill1 = critical[0] || "automation";
   const skill2 = critical[1] || "workflow systems";
   const skill3 = critical[2] || "API integrations";
@@ -369,22 +346,18 @@ function tailorCVToFitDescription() {
 <p class="mt-1">• <strong>${verb3}</strong> scalable ${skill3} frameworks, collaborating directly with stakeholders to translate business bottlenecks into automated, measurable workflows.</p>
   `.trim();
 
-  // 7. Inject Everything into the Document
   document.getElementById('cv-name').innerText = candidate.name;
   document.getElementById('cv-contact').innerText = cleanContactBar;
   document.getElementById('cv-summary-content').innerText = tailoredSummary;
   document.getElementById('cv-skills-content').innerText = tailoredSkills;
   document.getElementById('cv-experience-content').innerHTML = tailoredExperience;
 
-  // Preserve user's real Education if available
   if (parsedCV.education && parsedCV.education.trim().length > 10) {
     document.getElementById('cv-education-content').innerText = parsedCV.education.trim();
   }
 
-  // Set the downloaded PDF file name to the candidate's real name
   document.title = `${candidate.name.replace(/\s+/g, '_')}_Tailored_Resume`;
 
-  // 8. Re-score and display
   lastExtractedKeywords = keywords;
   document.getElementById('diagnostic-dashboard').classList.remove('hidden');
   recalculateAndRender();
@@ -393,14 +366,23 @@ function tailorCVToFitDescription() {
 }
 
 
+// ==========================================
+// ETI-CRAFT ENGINE: PART 4 (UI, AUTH & PAY)
+// ==========================================
 
-
-// --- AUTO-UPDATE LIVE CV BUILDER (REPLACES SAMPLE WITH USER DATA) ---
 function updateCVEditor(rawText) {
   if (!rawText || rawText.length < 20) return;
+  const candidate = extractCandidateDetails(rawText);
   const parsed = parseResumeSections(rawText);
-  if (parsed.name) document.getElementById('cv-name').innerText = parsed.name;
-  if (parsed.contact) document.getElementById('cv-contact').innerText = parsed.contact;
+
+  if (candidate.name) document.getElementById('cv-name').innerText = candidate.name;
+  
+  const contactParts = [candidate.location];
+  if (candidate.phone) contactParts.push(candidate.phone);
+  if (candidate.email) contactParts.push(candidate.email);
+  if (candidate.linkedin) contactParts.push(candidate.linkedin);
+  document.getElementById('cv-contact').innerText = contactParts.join(' | ');
+
   if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary.trim();
   if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills.trim();
   if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience.trim();
@@ -421,6 +403,7 @@ function initAuth() {
   const modal = document.getElementById('auth-modal');
   const closeBtn = document.getElementById('close-auth-btn');
   const emailForm = document.getElementById('email-auth-form');
+  const googleBtn = document.getElementById('google-auth-btn');
 
   if (triggerBtn && modal) triggerBtn.addEventListener('click', () => modal.classList.remove('hidden'));
   if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
@@ -434,7 +417,20 @@ function initAuth() {
         localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
         modal.classList.add('hidden');
         renderUserAuthState();
-        alert(`Signed in as ${profile.name}!`);
+        alert(`Welcome, ${profile.name}! You are signed in.`);
+      }
+    });
+  }
+
+  if (googleBtn) {
+    googleBtn.addEventListener('click', () => {
+      const email = prompt("Enter your Google Account email (e.g. user@gmail.com):");
+      if (email && email.includes('@')) {
+        const profile = { name: email.split('@')[0].toUpperCase(), email: email, provider: 'google' };
+        localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
+        modal.classList.add('hidden');
+        renderUserAuthState();
+        alert(`Signed in with Google as ${profile.name}!`);
       }
     });
   }
@@ -531,12 +527,11 @@ function initScanner() {
   const paywallModal = document.getElementById('paywall-modal');
   const closePaywall = document.getElementById('close-paywall-btn');
   const downloadPdf = document.getElementById('download-pdf-trigger');
+  const paystackBtn = document.getElementById('paystack-subscribe-btn');
 
   if (clearJd) clearJd.addEventListener('click', () => document.getElementById('job-description-input').value = '');
   if (clearCv) clearCv.addEventListener('click', () => document.getElementById('resume-input').value = '');
   if (closePaywall) closePaywall.addEventListener('click', () => paywallModal.classList.add('hidden'));
-
-  if (autoTailorBtn) autoTailorBtn.addEventListener('click', tailorCVToFitDescription);
 
   if (downloadPdf) {
     downloadPdf.addEventListener('click', () => {
@@ -548,11 +543,31 @@ function initScanner() {
     });
   }
 
+  if (autoTailorBtn) {
+    autoTailorBtn.addEventListener('click', () => {
+      if (!isSubscribed() && getTrialsRemaining() <= 0) {
+        if (paywallModal) paywallModal.classList.remove('hidden');
+        return;
+      }
+      if (!consumeTrial()) {
+        if (paywallModal) paywallModal.classList.remove('hidden');
+        return;
+      }
+      renderUserAuthState();
+      tailorCVToFitDescription();
+    });
+  }
+
   if (runBtn) {
     runBtn.addEventListener('click', () => {
       const jd = document.getElementById('job-description-input').value.trim();
       if (!jd) {
         alert("Please paste a Job Description first.");
+        return;
+      }
+
+      if (!isSubscribed() && getTrialsRemaining() <= 0) {
+        if (paywallModal) paywallModal.classList.remove('hidden');
         return;
       }
 
@@ -564,21 +579,46 @@ function initScanner() {
       renderUserAuthState();
       lastExtractedKeywords = extractJobKeywords(jd);
       document.getElementById('diagnostic-dashboard').classList.remove('hidden');
-
-      if (currentMode === 'extractor') {
-        const catView = document.getElementById('categorized-extractor-view');
-        if (catView) {
-          catView.classList.remove('hidden');
-          document.getElementById('cat-hard-skills').innerHTML = lastExtractedKeywords.hardSkills.map(s => `<li>• ${s}</li>`).join('') || "<li>None detected</li>";
-          document.getElementById('cat-soft-skills').innerHTML = lastExtractedKeywords.softSkills.map(s => `<li>• ${s}</li>`).join('') || "<li>None detected</li>";
-          document.getElementById('cat-action-verbs').innerHTML = lastExtractedKeywords.actionVerbs.map(s => `<li>• ${s}</li>`).join('') || "<li>None detected</li>";
-        }
-        return;
-      }
-
       recalculateAndRender();
     });
   }
+
+  if (paystackBtn) {
+    paystackBtn.addEventListener('click', initiatePaystackSubscription);
+  }
+}
+
+function initiatePaystackSubscription() {
+  const selectedPlan = document.querySelector('input[name="sub_plan"]:checked').value;
+  const isYearly = selectedPlan === 'yearly';
+  const amount = isYearly ? 30000 * 100 : 3000 * 100;
+
+  const user = getUser();
+  const userEmail = (user && user.email) ? user.email : "customer@example.com";
+
+  if (!window.PaystackPop) {
+    alert("Paystack could not load. Please check your internet connection.");
+    return;
+  }
+
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: userEmail,
+    amount: amount,
+    currency: "NGN",
+    ref: "SUB_" + Math.floor((Math.random() * 1000000000) + 1),
+    callback: function(response) {
+      alert("🎉 Subscription Activated! Unlimited scans, tailoring, and PDF downloads unlocked.");
+      localStorage.setItem('eticraft_subscribed', 'true');
+      document.getElementById('paywall-modal').classList.add('hidden');
+      renderUserAuthState();
+    },
+    onClose: function() {
+      alert("Subscription payment was cancelled.");
+    }
+  });
+
+  handler.openIframe();
 }
 
 function initCVLiveEditor() {
