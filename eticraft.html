@@ -23,6 +23,16 @@
       }
     }
   </script>
+
+
+<!-- PDF.js for PDF text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Mammoth.js for Word (.docx) extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <!-- Tesseract.js for Image OCR (.png, .jpg, .jpeg) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen flex flex-col">
 
@@ -75,7 +85,36 @@
       </div>
 
       <!-- Raw CV Input -->
+
+<!-- Raw CV Input & Document/Image Uploader -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col" id="cv-input-wrapper">
+        <div class="flex justify-between items-center mb-2">
+          <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+            📄 Your CV / Resume (Paste or Upload)
+          </label>
+          <button id="clear-cv-btn" class="text-xs text-slate-400 hover:text-rose-500">Clear</button>
+        </div>
+
+        <!-- Document / Image Upload Box -->
+        <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-brand rounded-lg p-3 mb-3 text-center cursor-pointer bg-slate-50 hover:bg-emerald-50/40 transition">
+          <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt,image/png,image/jpeg,image/jpg" class="hidden">
+          <div class="flex flex-col items-center justify-center space-y-1">
+            <span class="text-xl">📁</span>
+            <p class="text-xs font-semibold text-slate-700">
+              <span class="text-brand underline">Click to upload</span> or drag document / picture
+            </p>
+            <p class="text-[10px] text-slate-400">PDF, Word (.docx), or Image (.png, .jpg)</p>
+          </div>
+          <div id="upload-progress-bar" class="hidden mt-2 text-xs font-semibold text-brand animate-pulse">
+            ⏳ Reading text from file... Please wait.
+          </div>
+        </div>
+
+        <!-- Textarea (Auto-filled by upload or manual paste) -->
+        <textarea id="resume-input" rows="5" placeholder="Uploaded text appears here, or paste raw CV directly..."
+          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-mono text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
+      </div>
+
         <div class="flex justify-between items-center mb-2">
           <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
             📄 Paste Your Current CV / Resume

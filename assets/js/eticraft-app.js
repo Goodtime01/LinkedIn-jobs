@@ -1,4 +1,7 @@
 import { ATSEngine } from './ats-engine.js';
+import { CVUploader } from './cv-uploader.js';
+import { AuthManager } from './auth.js';
+import { ATSEngine } from './ats-engine.js';
 
 // ==========================================
 // 🔴 PAYSTACK LIVE PUBLIC KEY CONFIGURATION
@@ -20,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initUI();
   updateTrialDisplay();
   setupSectionTracking();
+  setupFileUploadListeners();
+  setupAuthListeners();
+  renderUserAuthState();
 });
 
 function updateTrialDisplay() {
@@ -245,4 +251,106 @@ function initiatePaystackSubscription() {
   });
 
   handler.openIframe();
+}
+
+// Document & Image Upload Listener
+function setupFileUploadListeners() {
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('cv-file-input');
+  const progressBar = document.getElementById('upload-progress-bar');
+  const resumeTextarea = document.getElementById('resume-input');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      progressBar.classList.remove('hidden');
+      progressBar.innerText = "⏳ Processing file... please wait";
+
+      const extractedText = await CVUploader.processFile(file, (msg) => {
+        progressBar.innerText = `⏳ ${msg}`;
+      });
+
+      resumeTextarea.value = extractedText;
+      progressBar.classList.add('hidden');
+
+      // Auto-parse into Live CV Tailor sections
+      const parsed = ATSEngine.parseResumeSections(extractedText);
+      if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary;
+      if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills;
+      if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience;
+      if (parsed.education) document.getElementById('cv-education-content').innerText = parsed.education;
+
+      alert(`✅ Successfully loaded: ${file.name}`);
+    } catch (err) {
+      progressBar.classList.add('hidden');
+      alert(`Upload error: ${err.message}`);
+    }
+  });
+}
+
+// Google & Email Sign In Listeners
+function setupAuthListeners() {
+  const authModal = document.getElementById('auth-modal');
+  const triggerBtn = document.getElementById('auth-trigger-btn');
+  const closeBtn = document.getElementById('close-auth-btn');
+  const emailForm = document.getElementById('email-auth-form');
+
+  if (triggerBtn) triggerBtn.addEventListener('click', () => authModal.classList.remove('hidden'));
+  if (closeBtn) closeBtn.addEventListener('click', () => authModal.classList.add('hidden'));
+
+  // Email Submit
+  if (emailForm) {
+    emailForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('auth-email-input').value.trim();
+      if (email) {
+        AuthManager.signInWithEmail(email);
+        authModal.classList.add('hidden');
+        renderUserAuthState();
+      }
+    });
+  }
+
+  // Google Identity Services Initializer
+  if (window.google) {
+    window.google.accounts.id.initialize({
+      client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com", // Optional, works in demo
+      callback: (res) => {
+        const user = AuthManager.handleGoogleCredential(res);
+        if (user) {
+          authModal.classList.add('hidden');
+          renderUserAuthState();
+        }
+      }
+    });
+    window.google.accounts.id.renderButton(
+      document.getElementById('google-signin-wrapper'),
+      { theme: "outline", size: "large", width: 240 }
+    );
+  }
+}
+
+function renderUserAuthState() {
+  const user = AuthManager.getUser();
+  const authContainer = document.getElementById('auth-container');
+  const trials = AuthManager.getTrialsRemaining();
+  
+  document.getElementById('trials-remaining').innerText = AuthManager.isSubscribed() ? "∞" : trials;
+
+  if (user) {
+    authContainer.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <span class="text-xs font-semibold text-slate-700">${user.name}</span>
+        <button id="signout-btn" class="text-[11px] text-slate-400 hover:text-rose-600 underline">Sign out</button>
+      </div>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', () => {
+      AuthManager.signOut();
+      renderUserAuthState();
+    });
+  }
 }
