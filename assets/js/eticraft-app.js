@@ -1,3 +1,24 @@
+// --- FIREBASE GOOGLE AUTH INITIALIZATION ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDe36CpQIndbGJ7Wq9ViBQJZXRYJY4LD9U",
+  authDomain: "eighty-knee.firebaseapp.com",
+  projectId: "eighty-knee",
+  storageBucket: "eighty-knee.firebasestorage.app",
+  messagingSenderId: "815262892973",
+  appId: "1:815262892973:web:d8e3e5f897ed50fff1724"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const fbAuth = getAuth(fbApp);
+const fbProvider = new GoogleAuthProvider();
+
+
+
+
+
 // ==========================================
 // ETI-CRAFT ENGINE: PART 1 (STATE & CLEANER)
 // ==========================================
@@ -398,7 +419,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderUserAuthState();
 });
 
-// --- SIGN IN CONTROLLER (GOOGLE + EMAIL) ---
+
+
+
+// --- AUTH CONTROLLER (REAL FIREBASE GOOGLE POPUP + EMAIL) ---
 function initAuth() {
   const modal = document.getElementById('auth-modal');
   const closeBtn = document.getElementById('close-auth-btn');
@@ -409,7 +433,7 @@ function initAuth() {
     closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
   }
 
-  // 1. Sign In with Email
+  // 1. Email Sign-In
   if (emailForm) {
     emailForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -427,27 +451,34 @@ function initAuth() {
     });
   }
 
-  // 2. Sign In with Google
+  // 2. REAL FIREBASE GOOGLE SIGN-IN POPUP
   if (googleBtn) {
-    googleBtn.addEventListener('click', () => {
-      const email = prompt("Enter your Google Account email (e.g. user@gmail.com):");
-      if (email && email.includes('@')) {
+    googleBtn.addEventListener('click', async () => {
+      try {
+        const result = await signInWithPopup(fbAuth, fbProvider);
+        const user = result.user;
         const profile = {
-          name: email.split('@')[0].toUpperCase(),
-          email: email,
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          photo: user.photoURL,
           provider: 'google'
         };
+
         localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
         if (modal) modal.classList.add('hidden');
         renderUserAuthState();
         alert(`Signed in with Google as ${profile.name}!`);
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
+        alert(`Google Sign-In: ${error.message}`);
       }
     });
   }
 }
 
 
-// --- DYNAMIC HEADER: SWITCHES BETWEEN 'SIGN IN' AND 'SIGN OUT' ---
+
+// --- DYNAMIC HEADER WITH FIREBASE SIGN-OUT ---
 function renderUserAuthState() {
   const user = getUser();
   const authContainer = document.getElementById('auth-container');
@@ -459,7 +490,6 @@ function renderUserAuthState() {
 
   if (!authContainer) return;
 
-  // 1. IF SIGNED IN: Show Name + Red 'Sign Out' Button
   if (user) {
     authContainer.innerHTML = `
       <div class="flex items-center space-x-2">
@@ -470,14 +500,13 @@ function renderUserAuthState() {
       </div>
     `;
 
-    document.getElementById('signout-btn').addEventListener('click', () => {
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      try { await signOut(fbAuth); } catch (e) {}
       localStorage.removeItem('eticraft_user_profile');
-      renderUserAuthState(); // Instantly returns to the Sign In button
+      renderUserAuthState();
       alert("You have successfully signed out.");
     });
-  } 
-  // 2. IF SIGNED OUT: Show the Black 'Sign In' Button
-  else {
+  } else {
     authContainer.innerHTML = `
       <button id="auth-trigger-btn" class="text-xs bg-slate-900 text-white font-medium px-3.5 py-2 rounded-lg hover:bg-slate-800 transition cursor-pointer">
         Sign In
@@ -487,12 +516,11 @@ function renderUserAuthState() {
     const triggerBtn = document.getElementById('auth-trigger-btn');
     const modal = document.getElementById('auth-modal');
     if (triggerBtn && modal) {
-      triggerBtn.addEventListener('click', () => {
-        modal.classList.remove('hidden');
-      });
+      triggerBtn.addEventListener('click', () => modal.classList.remove('hidden'));
     }
   }
 }
+  
 
 function initFileUpload() {
   const dropZone = document.getElementById('drop-zone');
