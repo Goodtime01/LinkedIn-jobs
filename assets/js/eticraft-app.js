@@ -412,6 +412,13 @@ function initScanner() {
         return;
       }
 
+
+const autoTailorBtn = document.getElementById('auto-tailor-btn');
+  if (autoTailorBtn) {
+    autoTailorBtn.addEventListener('click', tailorCVToFitDescription);
+  }
+
+
       if (!consumeTrial()) {
         if (paywallModal) paywallModal.classList.remove('hidden');
         return;
@@ -515,4 +522,66 @@ function recalculateAndRender() {
       </span>
     `).join('');
   }
+}
+
+
+// =========================================================
+// AI-STYLE PROCEDURAL CV TAILORING ENGINE
+// =========================================================
+function tailorCVToFitDescription() {
+  const jd = document.getElementById('job-description-input').value.trim();
+  const resume = document.getElementById('resume-input').value.trim();
+
+  if (!jd) {
+    alert("Please paste a Job Description first so we know what to tailor against!");
+    return;
+  }
+
+  // 1. Extract requirements & key verbs from the Job Description
+  const keywords = extractJobKeywords(jd);
+  const topHardSkills = keywords.hardSkills.slice(0, 6);
+  const topVerbs = keywords.actionVerbs.length >= 3 ? keywords.actionVerbs : ["engineered", "streamlined", "orchestrated", "automated"];
+  const critical = keywords.criticalKeywords.slice(0, 5);
+
+  // Inferred Job Title from JD
+  const firstLine = jd.split('\n')[0].replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  const targetTitle = firstLine.length < 40 && firstLine.length > 5 ? firstLine : "Workflow & Technology Specialist";
+
+  // 2. Synthesize High-Impact Professional Summary
+  const skillsList = topHardSkills.length ? topHardSkills.join(', ') : "process automation, workflow architecture, and API integration";
+  const tailoredSummary = `Results-oriented ${targetTitle} with proven expertise in ${skillsList}. Demonstrates a track record of bridging technical execution with strategic operations, specializing in end-to-end system design, workflow optimization, and high-impact digital problem-solving. Committed to delivering scalable, high-efficiency solutions tailored to organizational objectives.`;
+
+  // 3. Re-organize Skills Matrix into Clean Professional Categories
+  const coreTech = topHardSkills.length ? topHardSkills.map(s => s.toUpperCase()).join(' • ') : "ZAPIER • MAKE.COM • AIRTABLE • REST APIS";
+  const softCompetencies = keywords.softSkills.length ? keywords.softSkills.join(' • ') : "Cross-Functional Leadership • Agile Execution • Troubleshooting • Process Optimization";
+  
+  const tailoredSkills = `• Core Technical Stack: ${coreTech}\n• Functional Competencies: System Architecture, Workflow Automation, Webhook Engineering, Database Modeling\n• Operational & Soft Skills: ${softCompetencies}`;
+
+  // 4. Construct Impact-Driven Experience Bullets (Google XYZ Formula)
+  const verb1 = (topVerbs[0] || "Engineered").toUpperCase();
+  const verb2 = (topVerbs[1] || "Automated").toUpperCase();
+  const verb3 = (topVerbs[2] || "Streamlined").toUpperCase();
+
+  const skill1 = critical[0] || "automation";
+  const skill2 = critical[1] || "workflow systems";
+  const skill3 = critical[2] || "API integrations";
+
+  const tailoredExperience = `
+<p class="font-bold text-slate-800">${targetTitle} | Professional Projects & Consulting</p>
+<p class="mt-1">• <strong>${verb1}</strong> robust ${skill1} pipelines and data architectures, reducing manual processing overhead by 45% while ensuring 99.8% execution accuracy.</p>
+<p class="mt-1">• <strong>${verb2}</strong> end-to-end ${skill2} and multi-system integrations to eliminate data silos and accelerate cross-functional delivery cycles by 3x.</p>
+<p class="mt-1">• <strong>${verb3}</strong> scalable ${skill3} frameworks, collaborating directly with stakeholders to translate business bottlenecks into automated, measurable workflows.</p>
+  `.trim();
+
+  // 5. Inject directly into the Live CV Tailor DOM
+  document.getElementById('cv-summary-content').innerText = tailoredSummary;
+  document.getElementById('cv-skills-content').innerText = tailoredSkills;
+  document.getElementById('cv-experience-content').innerHTML = tailoredExperience;
+
+  // 6. Recalculate score & light up green matched badges
+  lastExtractedKeywords = keywords;
+  document.getElementById('diagnostic-dashboard').classList.remove('hidden');
+  recalculateAndRender();
+
+  alert("🎉 Success! Your CV has been tailored to fit this exact role. Check your new match score below!");
 }
