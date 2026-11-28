@@ -2,7 +2,7 @@
 // ETI-CRAFT ENGINE: PART 1 (STATE & CLEANER)
 // ==========================================
 
-const PAYSTACK_PUBLIC_KEY = "pk_live_YOUR_PAYSTACK_KEY_HERE";
+const PAYSTACK_PUBLIC_KEY = "pk_live_c70a3f5403ab816952f6bcd3b7243dc3bafb4318";
 const MAX_FREE_TRIALS = 5;
 
 const HARD_SKILLS = [
