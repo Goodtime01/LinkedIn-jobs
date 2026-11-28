@@ -565,6 +565,11 @@ function initScanner() {
   const closePaywall = document.getElementById('close-paywall-btn');
   const downloadPdf = document.getElementById('download-pdf-trigger');
   const paystackBtn = document.getElementById('paystack-subscribe-btn');
+  // Open subscription paywall anytime from the header button
+  const headerUpgradeBtn = document.getElementById('header-upgrade-btn');
+  if (headerUpgradeBtn && paywallModal) {
+    headerUpgradeBtn.addEventListener('click', () => paywallModal.classList.remove('hidden'));
+  }
 
   if (clearJd) clearJd.addEventListener('click', () => document.getElementById('job-description-input').value = '');
   if (clearCv) clearCv.addEventListener('click', () => document.getElementById('resume-input').value = '');
