@@ -1,15 +1,15 @@
 // =========================================================
-// ETI-CRAFT ATS ENGINE & CONTROLLER (CRASH-PROOF BUNDLE)
+// ETI-CRAFT V2: INTELLIGENT DE-DUPLICATOR & ATS ENGINE
 // =========================================================
 
-// --- 1. DOMAIN DICTIONARIES ---
 const HARD_SKILLS = [
   "zapier", "make.com", "integromat", "airtable", "n8n", "hubspot", "webhooks",
   "rest api", "json", "graphql", "sql", "postgresql", "supabase", "firebase",
   "bubble.io", "bubble", "webflow", "glide", "flutterflow", "retool", "shopify",
   "wordpress", "figma", "chatgpt", "openai", "claude", "prompt engineering",
   "llm", "voiceflow", "botpress", "git", "github", "ci/cd", "docker", "javascript",
-  "python", "html5", "css3", "project management", "clickup", "asana", "notion"
+  "python", "html5", "css3", "project management", "clickup", "asana", "notion",
+  "biology", "front-end", "developer", "operations", "virtual assistant"
 ];
 
 const SOFT_SKILLS = [
@@ -24,7 +24,10 @@ const ACTION_VERBS = [
   "designed", "developed", "formulated", "executed", "managed", "scaled"
 ];
 
+// Noise words to reject (including social links and query params)
 const STOP_WORDS = new Set([
+  "https", "http", "www", "com", "org", "whatsapp", "telegram", "channel", "apply",
+  "click", "link", "like", "opportunities", "jobdetails", "jobid", "clid", "ntkn",
   "a", "about", "above", "after", "again", "all", "am", "an", "and", "any", "are",
   "as", "at", "be", "because", "been", "before", "being", "both", "but", "by", "can",
   "did", "do", "does", "for", "from", "had", "has", "have", "he", "her", "here", "him",
@@ -35,8 +38,7 @@ const STOP_WORDS = new Set([
   "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your"
 ]);
 
-// --- 2. STATE & STORAGE MANAGEMENT ---
-let currentMode = 'tailor'; // 'tailor' | 'extractor'
+let currentMode = 'tailor';
 let activeSection = 'skills';
 let lastExtractedKeywords = null;
 const MAX_FREE_TRIALS = 5;
@@ -58,11 +60,38 @@ const consumeTrial = () => {
   return true;
 };
 
-// --- 3. CORE NLP ATS TEXT PROCESSOR ---
+// --- SMART TEXT SANITIZER (FIXES PDF STUTTER / REPEATS) ---
+function cleanExtractedText(raw) {
+  if (!raw) return "";
+  
+  // 1. Remove URLs and query strings completely
+  let text = raw.replace(/https?:\/\/[^\s]+/gi, ' ');
+
+  // 2. Fix the PDF spacing / stutter issue:
+  // Detects spaced duplicate letters like "B Bi io ol lo og gy y" or "C C U UR RR"
+  // Reconstructs clean words
+  text = text.replace(/([A-Za-z0-9])\s+\1(?!\w)/g, '$1');
+  
+  // 3. Fix words where every character got repeated twice (e.g. "EEnndd" -> "End")
+  text = text.split(/\s+/).map(word => {
+    // If a word has repeated sequential pairs (e.g. "CCUURRRRIICCUULLUUMM")
+    if (word.length > 4 && /([A-Za-z])\1([A-Za-z])\2/.test(word)) {
+      return word.replace(/([A-Za-z])\1+/g, '$1');
+    }
+    return word;
+  }).join(' ');
+
+  // 4. Normalize multiple spaces and line breaks
+  return text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// --- NLP TOKENIZER ---
 function tokenize(text) {
   if (!text) return [];
-  const tokens = text.toLowerCase().match(/[a-z0-9]+([\.\-\/][a-z0-9]+)*/g) || [];
-  return tokens.filter(t => !STOP_WORDS.has(t) && t.length > 1);
+  // Strip URLs and numbers before analyzing keywords
+  const clean = text.replace(/https?:\/\/[^\s]+/gi, ' ').replace(/\b\d+\b/g, ' ');
+  const tokens = clean.toLowerCase().match(/[a-z]+([\.\-\/][a-z]+)*/g) || [];
+  return tokens.filter(t => !STOP_WORDS.has(t) && t.length > 2 && !/^\d+$/.test(t));
 }
 
 function extractNGrams(text) {
@@ -75,18 +104,21 @@ function extractNGrams(text) {
 }
 
 function extractJobKeywords(jobText) {
-  const rawTokens = tokenize(jobText);
-  const ngrams = extractNGrams(jobText);
+  const clean = cleanExtractedText(jobText);
+  const rawTokens = tokenize(clean);
+  const ngrams = extractNGrams(clean);
   const freqMap = {};
   rawTokens.forEach(t => freqMap[t] = (freqMap[t] || 0) + 1);
 
-  const detectedHard = HARD_SKILLS.filter(s => ngrams.has(s) || jobText.toLowerCase().includes(s));
-  const detectedSoft = SOFT_SKILLS.filter(s => ngrams.has(s) || jobText.toLowerCase().includes(s));
+  const detectedHard = HARD_SKILLS.filter(s => ngrams.has(s) || clean.toLowerCase().includes(s));
+  const detectedSoft = SOFT_SKILLS.filter(s => ngrams.has(s) || clean.toLowerCase().includes(s));
   const detectedVerbs = ACTION_VERBS.filter(v => ngrams.has(v));
 
   const classified = new Set([...detectedHard, ...detectedSoft, ...detectedVerbs]);
+  
+  // Pull top keywords, rejecting pure numbers or web garbage
   const topDomain = Object.entries(freqMap)
-    .filter(([w]) => !classified.has(w) && w.length > 3)
+    .filter(([w]) => !classified.has(w) && w.length > 3 && !STOP_WORDS.has(w))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([w]) => w);
@@ -100,8 +132,9 @@ function extractJobKeywords(jobText) {
 }
 
 function calculateMatch(jobKeywords, resumeText) {
-  const resumeNGrams = extractNGrams(resumeText);
-  const resumeRaw = resumeText.toLowerCase();
+  const cleanResume = cleanExtractedText(resumeText);
+  const resumeNGrams = extractNGrams(cleanResume);
+  const resumeRaw = cleanResume.toLowerCase();
 
   const matched = [];
   const missing = [];
@@ -130,97 +163,116 @@ function calculateMatch(jobKeywords, resumeText) {
   };
 }
 
+// --- ACCURATE RESUME SECTION PARSER ---
 function parseResumeSections(rawText) {
-  const sections = { summary: "", skills: "", experience: "", education: "" };
-  const lines = rawText.split('\n');
-  let currentSection = 'summary';
+  const clean = cleanExtractedText(rawText);
+  const sections = {
+    contact: "",
+    summary: "",
+    skills: "",
+    experience: "",
+    education: ""
+  };
 
-  const headerPatterns = {
-    summary: /^(professional\s+)?summary|about\s+me|profile/i,
-    skills: /^(technical\s+)?skills|competencies|tools|technologies/i,
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  let currentSec = 'contact';
+
+  const patterns = {
+    summary: /^(professional\s+)?summary|profile|about\s+me/i,
+    skills: /^(technical\s+)?skills|competencies|tools/i,
     experience: /^(work\s+)?experience|employment|work\s+history/i,
     education: /^education|academic|qualifications/i
   };
 
-  lines.forEach(line => {
-    const trimmed = line.trim();
+  lines.forEach((line, index) => {
+    // If we're at the top 3-4 lines and no header has triggered, it's contact/header info
+    if (index < 4 && currentSec === 'contact') {
+      sections.contact += line + " | ";
+      return;
+    }
+
     let isHeader = false;
-    for (const [key, regex] of Object.entries(headerPatterns)) {
-      if (regex.test(trimmed) && trimmed.length < 35) {
-        currentSection = key;
+    for (const [key, regex] of Object.entries(patterns)) {
+      if (regex.test(line) && line.length < 35) {
+        currentSec = key;
         isHeader = true;
         break;
       }
     }
-    if (!isHeader && trimmed.length > 0) {
-      sections[currentSection] += `${trimmed}\n`;
+
+    if (!isHeader) {
+      if (currentSec === 'contact') currentSec = 'summary';
+      sections[currentSec] += line + "\n";
     }
   });
+
   return sections;
 }
 
-// --- 4. MULTI-FORMAT FILE EXTRACTOR (PDF, DOCX, TXT, OCR) ---
+// --- FILE EXTRACTOR WITH PROPER PDF KERNING MERGE ---
 async function processUploadedFile(file, onProgress) {
   const fileName = file.name.toLowerCase();
 
-  // 1. Plain text
+  // 1. TXT
   if (file.type === 'text/plain' || fileName.endsWith('.txt')) {
-    return await file.text();
+    return cleanExtractedText(await file.text());
   }
 
   // 2. PDF Document
   if (fileName.endsWith('.pdf')) {
-    if (!window.pdfjsLib) throw new Error("PDF parser loading... please retry in 5 seconds.");
-    if (onProgress) onProgress("Parsing PDF pages...");
+    if (!window.pdfjsLib) throw new Error("PDF parser loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Reading PDF pages...");
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+      const content = await page.getTextContent();
+      
+      // Combine text items smoothly without adding spaces between fragmented characters
+      let lastY, text = "";
+      for (const item of content.items) {
+        if (lastY === undefined || Math.abs(item.transform[5] - lastY) < 4) {
+          text += item.str;
+        } else {
+          text += "\n" + item.str;
+        }
+        lastY = item.transform[5];
+      }
+      fullText += text + "\n\n";
     }
-    return fullText;
+    return cleanExtractedText(fullText);
   }
 
   // 3. Word Document (.docx)
   if (fileName.endsWith('.docx')) {
-    if (!window.mammoth) throw new Error("Word parser loading... please retry in 5 seconds.");
-    if (onProgress) onProgress("Reading Word (.docx) document...");
+    if (!window.mammoth) throw new Error("Word parser loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Reading Word (.docx)...");
     const arrayBuffer = await file.arrayBuffer();
-    const result = await window.mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-    return result.value;
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    return cleanExtractedText(result.value);
   }
 
-  // 4. Image (.png, .jpg, .jpeg via Tesseract OCR)
+  // 4. Image OCR
   if (file.type.startsWith('image/') || fileName.match(/\.(png|jpg|jpeg)$/)) {
-    if (!window.Tesseract) throw new Error("Image OCR engine loading... please retry in 5 seconds.");
-    if (onProgress) onProgress("Scanning picture via OCR (this takes ~5-10s)...");
-    const ret = await window.Tesseract.recognize(file, 'eng', {
-      logger: m => {
-        if (m.status === 'recognizing text' && onProgress) {
-          onProgress(`Scanning image: ${Math.round(m.progress * 100)}%`);
-        }
-      }
-    });
-    return ret.data.text;
+    if (!window.Tesseract) throw new Error("OCR engine loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Running OCR on image (~5-10s)...");
+    const ret = await window.Tesseract.recognize(file, 'eng');
+    return cleanExtractedText(ret.data.text);
   }
 
-  throw new Error("Unsupported file format. Please upload a PDF, Word (.docx), TXT, or Image.");
+  throw new Error("Unsupported format. Please upload PDF, Word (.docx), or Image.");
 }
 
-// --- 5. INITIALIZATION & UI LISTENERS ---
+// --- UI WIRING ---
 document.addEventListener('DOMContentLoaded', () => {
-  try {
-    initAuth();
-    initFileUpload();
-    initTabs();
-    initScanner();
-    initCVLiveEditor();
-    renderUserAuthState();
-  } catch (err) {
-    console.error("Initialization error:", err);
-  }
+  initAuth();
+  initFileUpload();
+  initTabs();
+  initScanner();
+  initCVLiveEditor();
+  renderUserAuthState();
 });
 
 function initAuth() {
@@ -229,60 +281,21 @@ function initAuth() {
   const closeBtn = document.getElementById('close-auth-btn');
   const emailForm = document.getElementById('email-auth-form');
 
-  if (triggerBtn && modal) {
-    triggerBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      modal.classList.remove('hidden');
-    });
-  }
-
-  if (closeBtn && modal) {
-    closeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      modal.classList.add('hidden');
-    });
-  }
+  if (triggerBtn && modal) triggerBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
 
   if (emailForm) {
     emailForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const emailInput = document.getElementById('auth-email-input');
-      const email = emailInput ? emailInput.value.trim() : '';
+      const email = document.getElementById('auth-email-input').value.trim();
       if (email) {
         const profile = { name: email.split('@')[0], email: email, provider: 'email' };
         localStorage.setItem('eticraft_user_profile', JSON.stringify(profile));
         modal.classList.add('hidden');
         renderUserAuthState();
-        alert(`Welcome, ${profile.name}! You are signed in.`);
+        alert(`Signed in as ${profile.name}!`);
       }
     });
-  }
-
-  // Safe Google Identity Services check (never throws)
-  try {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      window.google.accounts.id.initialize({
-        client_id: "demo-client-id.apps.googleusercontent.com",
-        callback: (res) => {
-          try {
-            const base64Url = res.credential.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const payload = JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
-            localStorage.setItem('eticraft_user_profile', JSON.stringify({ name: payload.name, email: payload.email, provider: 'google' }));
-            if (modal) modal.classList.add('hidden');
-            renderUserAuthState();
-          } catch (e) {
-            console.warn("Google credential parse skipped:", e);
-          }
-        }
-      });
-      const gWrapper = document.getElementById('google-signin-wrapper');
-      if (gWrapper) {
-        window.google.accounts.id.renderButton(gWrapper, { theme: "outline", size: "large", width: 240 });
-      }
-    }
-  } catch (gErr) {
-    console.warn("Google Identity Services in demo mode.");
   }
 }
 
@@ -291,9 +304,7 @@ function renderUserAuthState() {
   const authContainer = document.getElementById('auth-container');
   const trialsBadge = document.getElementById('trials-remaining');
 
-  if (trialsBadge) {
-    trialsBadge.innerText = isSubscribed() ? "∞" : getTrialsRemaining();
-  }
+  if (trialsBadge) trialsBadge.innerText = isSubscribed() ? "∞" : getTrialsRemaining();
 
   if (user && authContainer) {
     authContainer.innerHTML = `
@@ -302,13 +313,10 @@ function renderUserAuthState() {
         <button id="signout-btn" class="text-[11px] text-rose-500 hover:text-rose-700 underline font-medium">Sign out</button>
       </div>
     `;
-    const signOutBtn = document.getElementById('signout-btn');
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', () => {
-        localStorage.removeItem('eticraft_user_profile');
-        renderUserAuthState();
-      });
-    }
+    document.getElementById('signout-btn').addEventListener('click', () => {
+      localStorage.removeItem('eticraft_user_profile');
+      renderUserAuthState();
+    });
   }
 }
 
@@ -319,35 +327,29 @@ function initFileUpload() {
   const resumeTextarea = document.getElementById('resume-input');
 
   if (dropZone && fileInput) {
-    dropZone.addEventListener('click', (e) => {
-      if (e.target !== fileInput) fileInput.click();
-    });
+    dropZone.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
       try {
-        if (progressBar) {
-          progressBar.classList.remove('hidden');
-          progressBar.innerText = "⏳ Processing file... please wait";
-        }
-
-        const extractedText = await processUploadedFile(file, (msg) => {
+        if (progressBar) progressBar.classList.remove('hidden');
+        const extracted = await processUploadedFile(file, (msg) => {
           if (progressBar) progressBar.innerText = `⏳ ${msg}`;
         });
 
-        if (resumeTextarea) resumeTextarea.value = extractedText;
+        if (resumeTextarea) resumeTextarea.value = extracted;
         if (progressBar) progressBar.classList.add('hidden');
 
-        // Auto-fill sections in Live Tailor
-        const parsed = parseResumeSections(extractedText);
-        if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary;
-        if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills;
-        if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience;
-        if (parsed.education) document.getElementById('cv-education-content').innerText = parsed.education;
+        // Automatically format sections in the Live CV Builder
+        const parsed = parseResumeSections(extracted);
+        if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary.trim();
+        if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills.trim();
+        if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience.trim();
+        if (parsed.education) document.getElementById('cv-education-content').innerText = parsed.education.trim();
 
-        alert(`✅ Extracted text from: ${file.name}`);
+        alert(`✅ Cleaned and loaded: ${file.name}`);
       } catch (err) {
         if (progressBar) progressBar.classList.add('hidden');
         alert(`Upload error: ${err.message}`);
@@ -469,15 +471,15 @@ function recalculateAndRender() {
   const scoreRing = document.getElementById('score-ring');
   if (scoreRing) {
     if (result.score >= 70) {
-      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-emerald-50 border-4 border-emerald-500 text-emerald-600";
+      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-emerald-50 border-4 border-emerald-500 text-emerald-600 font-bold";
     } else if (result.score >= 45) {
-      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-amber-50 border-4 border-amber-500 text-amber-600";
+      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-amber-50 border-4 border-amber-500 text-amber-600 font-bold";
     } else {
-      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-rose-50 border-4 border-rose-500 text-rose-600";
+      scoreRing.className = "relative w-24 h-24 flex items-center justify-center rounded-full bg-rose-50 border-4 border-rose-500 text-rose-600 font-bold";
     }
   }
 
-  // Missing Keywords (Clickable)
+  // Missing Keywords (Click to Insert)
   const missingBox = document.getElementById('missing-keywords-container');
   if (missingBox) {
     document.getElementById('missing-count').innerText = result.missingKeywords.length;
@@ -503,7 +505,7 @@ function recalculateAndRender() {
     });
   }
 
-// Matched Keywords
+  // Matched Keywords
   const matchedBox = document.getElementById('matched-keywords-container');
   if (matchedBox) {
     document.getElementById('matched-count').innerText = result.matchedKeywords.length;

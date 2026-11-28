@@ -70,61 +70,54 @@
       </button>
     </div>
 
-    <!-- Dual Input Workspace (Hidden on Print) -->
+
+
+
+
+    
+<!-- Dual Input Workspace (Single Clean Layout) -->
     <div class="no-print grid grid-cols-1 lg:grid-cols-2 gap-6" id="input-workspace">
-      <!-- Job Description Input -->
+      <!-- 1. Job Description Input -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
         <div class="flex justify-between items-center mb-2">
           <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-            📋 Paste Job Description (Target Role)
+            📋 Target Job Description
           </label>
-          <button id="clear-jd-btn" class="text-xs text-slate-400 hover:text-rose-500">Clear</button>
+          <button id="clear-jd-btn" class="text-xs text-slate-400 hover:text-rose-500 font-medium">Clear</button>
         </div>
-        <textarea id="job-description-input" rows="8" placeholder="Paste the complete job posting here (responsibilities, requirements, qualifications)..."
-          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-mono text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
+        <textarea id="job-description-input" rows="8" placeholder="Paste the job requirements, responsibilities, or role description here..."
+          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-sans text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
       </div>
 
-      <!-- Raw CV Input -->
-
-<!-- Raw CV Input & Document/Image Uploader -->
+      <!-- 2. Your CV Input & File Dropzone (Single Clean Box) -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col" id="cv-input-wrapper">
         <div class="flex justify-between items-center mb-2">
           <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-            📄 Your CV / Resume (Paste or Upload)
+            📄 Your CV / Resume
           </label>
-          <button id="clear-cv-btn" class="text-xs text-slate-400 hover:text-rose-500">Clear</button>
+          <button id="clear-cv-btn" class="text-xs text-slate-400 hover:text-rose-500 font-medium">Clear</button>
         </div>
 
-        <!-- Document / Image Upload Box -->
-        <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-brand rounded-lg p-3 mb-3 text-center cursor-pointer bg-slate-50 hover:bg-emerald-50/40 transition">
-          <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt,image/png,image/jpeg,image/jpg" class="hidden">
-          <div class="flex flex-col items-center justify-center space-y-1">
-            <span class="text-xl">📁</span>
+        <!-- File Upload Area -->
+        <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-brand rounded-lg p-3 mb-2 text-center cursor-pointer bg-slate-50 hover:bg-emerald-50/40 transition">
+          <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt,image/*" class="hidden">
+          <div class="flex items-center justify-center gap-2">
+            <span class="text-base">📁</span>
             <p class="text-xs font-semibold text-slate-700">
-              <span class="text-brand underline">Click to upload</span> or drag document / picture
+              <span class="text-brand underline">Upload PDF, Word, or Picture</span>
             </p>
-            <p class="text-[10px] text-slate-400">PDF, Word (.docx), or Image (.png, .jpg)</p>
           </div>
-          <div id="upload-progress-bar" class="hidden mt-2 text-xs font-semibold text-brand animate-pulse">
-            ⏳ Reading text from file... Please wait.
+          <div id="upload-progress-bar" class="hidden mt-1 text-[11px] font-semibold text-brand">
+            ⏳ Processing and cleaning text...
           </div>
         </div>
 
-        <!-- Textarea (Auto-filled by upload or manual paste) -->
-        <textarea id="resume-input" rows="5" placeholder="Uploaded text appears here, or paste raw CV directly..."
-          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-mono text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
-      </div>
-
-        <div class="flex justify-between items-center mb-2">
-          <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-            📄 Paste Your Current CV / Resume
-          </label>
-          <button id="clear-cv-btn" class="text-xs text-slate-400 hover:text-rose-500">Clear</button>
-        </div>
-        <textarea id="resume-input" rows="8" placeholder="Paste your entire raw resume text here. Eti-Craft will auto-detect sections..."
-          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-mono text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
+        <!-- Resume Textarea -->
+        <textarea id="resume-input" rows="5" placeholder="Extracted text will appear here automatically, or paste your raw CV..."
+          class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-sans text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
       </div>
     </div>
+
 
     <!-- Scanner Action Bar (Hidden on Print) -->
     <div class="no-print flex flex-col sm:flex-row gap-3 justify-end items-center">
