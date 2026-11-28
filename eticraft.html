@@ -10,29 +10,22 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Paystack Inline JS -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
-  <link rel="stylesheet" href="assets/css/eticraft.css">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: '#16a34a',
-            'brand-dark': '#15803d'
-          }
-        }
-      }
-    }
-  </script>
-
-
-<!-- PDF.js for PDF text extraction -->
+  <!-- PDF.js for PDF text extraction -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- Mammoth.js for Word (.docx) extraction -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <!-- Tesseract.js for Image OCR (.png, .jpg, .jpeg) -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
-
+  <link rel="stylesheet" href="assets/css/eticraft.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brand: '#16a34a', 'brand-dark': '#15803d' }
+        }
+      }
+    }
+  </script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen flex flex-col">
 
@@ -57,9 +50,8 @@
     </div>
   </header>
 
-  <!-- Main Application Body -->
+  <!-- Main Container -->
   <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
-
     <!-- Mode Selector Tabs (Hidden on Print) -->
     <div class="no-print flex border-b border-slate-200 space-x-4">
       <button id="tab-tailor" class="tab-btn active-tab pb-3 font-semibold text-sm border-b-2 border-brand text-brand flex items-center gap-2">
@@ -70,12 +62,7 @@
       </button>
     </div>
 
-
-
-
-
-    
-<!-- Dual Input Workspace (Single Clean Layout) -->
+    <!-- Dual Input Workspace -->
     <div class="no-print grid grid-cols-1 lg:grid-cols-2 gap-6" id="input-workspace">
       <!-- 1. Job Description Input -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
@@ -89,7 +76,7 @@
           class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-sans text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
       </div>
 
-      <!-- 2. Your CV Input & File Dropzone (Single Clean Box) -->
+      <!-- 2. Your CV Input & File Dropzone -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col" id="cv-input-wrapper">
         <div class="flex justify-between items-center mb-2">
           <label class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
@@ -98,7 +85,7 @@
           <button id="clear-cv-btn" class="text-xs text-slate-400 hover:text-rose-500 font-medium">Clear</button>
         </div>
 
-        <!-- File Upload Area -->
+        <!-- Upload Dropzone -->
         <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-brand rounded-lg p-3 mb-2 text-center cursor-pointer bg-slate-50 hover:bg-emerald-50/40 transition">
           <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt,image/*" class="hidden">
           <div class="flex items-center justify-center gap-2">
@@ -112,22 +99,18 @@
           </div>
         </div>
 
-        <!-- Resume Textarea -->
         <textarea id="resume-input" rows="5" placeholder="Extracted text will appear here automatically, or paste your raw CV..."
           class="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent outline-none resize-none font-sans text-slate-700 bg-slate-50 focus:bg-white transition"></textarea>
       </div>
     </div>
 
-
-    <!-- Scanner Action Bar (Hidden on Print) -->
+    <!-- Action Buttons -->
     <div class="no-print flex flex-col sm:flex-row gap-3 justify-end items-center">
       <button id="run-scanner-btn" class="w-full sm:w-auto px-6 py-3 bg-brand hover:bg-brand-dark text-white font-bold text-sm rounded-xl shadow-sm transition flex items-center justify-center gap-2">
-     <!-- Tailor CV Button -->
+        ⚡ Analyze & Match ATS Keywords
+      </button>
       <button id="auto-tailor-btn" class="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2">
         🪄 Tailor CV to fit Description
-      </button>
-     
-        ⚡ Analyze & Match ATS Keywords
       </button>
     </div>
 
@@ -142,7 +125,7 @@
           </div>
           <div>
             <h3 class="font-bold text-slate-900 text-lg" id="score-headline">Ready for Analysis</h3>
-            <p class="text-xs text-slate-500 max-w-md mt-1" id="score-subtext">Click 'Analyze' to evaluate your keyword density against this role.</p>
+            <p class="text-xs text-slate-500 max-w-md mt-1" id="score-subtext">Click 'Analyze' or 'Tailor CV' to match your keywords against this role.</p>
           </div>
         </div>
 
@@ -153,20 +136,17 @@
         </div>
       </div>
 
-      <!-- Keyword Breakdown Pills -->
+      <!-- Keyword Pills Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        <!-- Missing Critical Keywords (Click-to-Add) -->
+        <!-- Missing Critical Keywords -->
         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <div class="flex justify-between items-center mb-3">
             <h4 class="font-bold text-xs uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
               ⚠️ Missing Critical Keywords (<span id="missing-count">0</span>)
             </h4>
-            <span class="text-[11px] text-slate-400">Click a keyword to insert into CV</span>
+            <span class="text-[11px] text-slate-400">Click to insert into active section</span>
           </div>
-          <div id="missing-keywords-container" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
-            <!-- Populated via JS -->
-          </div>
+          <div id="missing-keywords-container" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1"></div>
         </div>
 
         <!-- Matched Keywords -->
@@ -177,13 +157,11 @@
             </h4>
             <span class="text-[11px] text-slate-400">Already in your CV</span>
           </div>
-          <div id="matched-keywords-container" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
-            <!-- Populated via JS -->
-          </div>
+          <div id="matched-keywords-container" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1"></div>
         </div>
       </div>
 
-      <!-- Categorized Extraction (For Extractor-Only Mode) -->
+      <!-- Extractor View -->
       <div id="categorized-extractor-view" class="hidden bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <h5 class="font-bold text-xs uppercase tracking-wider text-indigo-600 mb-2">🛠️ Hard Technical Skills</h5>
@@ -206,22 +184,22 @@
       <div class="no-print border-b pb-4 flex justify-between items-center">
         <div>
           <h3 class="font-bold text-slate-900 text-base">📝 Live CV Tailor & Section Editor</h3>
-          <p class="text-xs text-slate-500">Edit sections below. Click missing keywords above to insert them into your active cursor position.</p>
+          <p class="text-xs text-slate-500">Edit sections below. Click missing keywords to insert them into your active cursor position.</p>
         </div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-mono text-slate-400">Active Section:</span>
-          <span id="active-section-indicator" class="text-xs font-bold text-brand bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">Skills</span>
+          <span id="active-section-indicator" class="text-xs font-bold text-brand bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">SKILLS</span>
         </div>
       </div>
 
       <!-- The Printable ATS Document -->
-      <div id="printable-cv" class="printable-cv-document space-y-6 text-slate-900">
+      <div id="printable-cv" class="printable-cv-document space-y-6 text-slate-900 bg-white p-4 rounded-lg">
         
         <!-- Contact Header -->
         <div class="text-center pb-4 border-b border-slate-200">
-          <h1 id="cv-name" contenteditable="true" class="text-2xl font-bold tracking-tight outline-none focus:bg-amber-50">ETINI OBOP</h1>
+          <h1 id="cv-name" contenteditable="true" class="text-2xl font-bold tracking-tight outline-none focus:bg-amber-50">YOUR NAME</h1>
           <div id="cv-contact" contenteditable="true" class="text-xs text-slate-600 mt-1 space-x-2 outline-none focus:bg-amber-50">
-            <span>Lagos, Nigeria (Remote)</span> | <span>email@example.com</span> | <span>linkedin.com/in/etini-obop</span>
+            Location | Phone | Email | LinkedIn
           </div>
         </div>
 
@@ -229,7 +207,7 @@
         <div class="cv-section" data-section="summary">
           <h2 class="text-xs font-bold uppercase tracking-wider border-b border-slate-300 pb-1 mb-2 text-slate-800">Professional Summary</h2>
           <div id="cv-summary-content" contenteditable="true" class="cv-editable-content text-xs leading-relaxed text-slate-700 outline-none focus:bg-amber-50 min-h-[40px]">
-            Dynamic No-Code & Automation Developer specializing in workflow architecture, API integration, and AI operations...
+            Upload or paste your CV above to populate your summary...
           </div>
         </div>
 
@@ -237,7 +215,7 @@
         <div class="cv-section" data-section="skills">
           <h2 class="text-xs font-bold uppercase tracking-wider border-b border-slate-300 pb-1 mb-2 text-slate-800">Skills & Competencies</h2>
           <div id="cv-skills-content" contenteditable="true" class="cv-editable-content text-xs leading-relaxed text-slate-700 outline-none focus:bg-amber-50 min-h-[40px]">
-            Make.com, Zapier, Airtable, Bubble.io, Webflow, REST APIs, Webhooks, Process Automation, ChatGPT Workflow Design.
+            Your technical skills will populate here...
           </div>
         </div>
 
@@ -245,9 +223,7 @@
         <div class="cv-section" data-section="experience">
           <h2 class="text-xs font-bold uppercase tracking-wider border-b border-slate-300 pb-1 mb-2 text-slate-800">Professional Experience</h2>
           <div id="cv-experience-content" contenteditable="true" class="cv-editable-content text-xs leading-relaxed text-slate-700 outline-none focus:bg-amber-50 min-h-[80px]">
-            <p><strong>Automation & Workflow Specialist</strong> | Freelance & Consulting (2024 - Present)</p>
-            <p>• Engineered multi-step Make.com and Zapier webhooks reducing manual data triage by 65%.</p>
-            <p>• Built custom internal tools using Airtable relational schemas and OpenAI assistants.</p>
+            Your work history and project experience will populate here...
           </div>
         </div>
 
@@ -255,25 +231,23 @@
         <div class="cv-section" data-section="education">
           <h2 class="text-xs font-bold uppercase tracking-wider border-b border-slate-300 pb-1 mb-2 text-slate-800">Education & Credentials</h2>
           <div id="cv-education-content" contenteditable="true" class="cv-editable-content text-xs leading-relaxed text-slate-700 outline-none focus:bg-amber-50 min-h-[40px]">
-            <p>B.Sc. in Relevant Discipline | Certifications in Process Automation & No-Code Systems</p>
+            Your education and certifications will populate here...
           </div>
         </div>
 
       </div>
     </div>
-
   </main>
 
-  <!-- Paystack Subscription & Unlock Modal (Hidden on Print) -->
+  <!-- Paystack Paywall Modal -->
   <div id="paywall-modal" class="no-print fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
       <div class="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
         👑
       </div>
       <h3 class="text-lg font-bold text-slate-900">Unlock Eti-Craft Unlimited</h3>
-      <p class="text-xs text-slate-500">You have completed your 5 free optimization trials. Upgrade to download unlimited clean ATS PDFs and scan unlimited job descriptions.</p>
+      <p class="text-xs text-slate-500">You have completed your 5 free optimization trials. Upgrade to download unlimited clean ATS PDFs and scan unlimited roles.</p>
       
-      <!-- Tier Pricing Cards -->
       <div class="grid grid-cols-2 gap-3 pt-2">
         <label class="border-2 border-slate-200 hover:border-brand rounded-xl p-3 cursor-pointer text-left transition relative block">
           <input type="radio" name="sub_plan" value="monthly" checked class="absolute top-2.5 right-2.5 text-brand">
@@ -308,9 +282,7 @@
       <h3 class="text-base font-bold text-slate-900">Sign In to Eti-Craft</h3>
       <p class="text-xs text-slate-500">Track your 5 free optimization scans across devices.</p>
       
-      <div id="google-signin-wrapper" class="flex justify-center my-3">
-        <!-- Rendered by Google GSI -->
-      </div>
+      <div id="google-signin-wrapper" class="flex justify-center my-3"></div>
       
       <div class="relative my-3">
         <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
@@ -327,9 +299,7 @@
     </div>
   </div>
 
-  <!-- Script Modules -->
-  <script type="module" src="assets/js/dictionary.js"></script>
-  <script type="module" src="assets/js/ats-engine.js"></script>
+  <!-- App Script -->
   <script type="module" src="assets/js/eticraft-app.js"></script>
 </body>
 </html>

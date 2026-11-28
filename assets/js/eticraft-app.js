@@ -1,5 +1,5 @@
 // =========================================================
-// ETI-CRAFT V2: INTELLIGENT DE-DUPLICATOR & ATS ENGINE
+// ETI-CRAFT ALL-IN-ONE ENGINE: CRASH-PROOF BUNDLE
 // =========================================================
 
 const HARD_SKILLS = [
@@ -24,7 +24,6 @@ const ACTION_VERBS = [
   "designed", "developed", "formulated", "executed", "managed", "scaled"
 ];
 
-// Noise words to reject (including social links and query params)
 const STOP_WORDS = new Set([
   "https", "http", "www", "com", "org", "whatsapp", "telegram", "channel", "apply",
   "click", "link", "like", "opportunities", "jobdetails", "jobid", "clid", "ntkn",
@@ -60,35 +59,22 @@ const consumeTrial = () => {
   return true;
 };
 
-// --- SMART TEXT SANITIZER (FIXES PDF STUTTER / REPEATS) ---
+// --- FIXES PDF LETTER-STUTTER / REPEATED CHARACTERS ---
 function cleanExtractedText(raw) {
   if (!raw) return "";
-  
-  // 1. Remove URLs and query strings completely
   let text = raw.replace(/https?:\/\/[^\s]+/gi, ' ');
-
-  // 2. Fix the PDF spacing / stutter issue:
-  // Detects spaced duplicate letters like "B Bi io ol lo og gy y" or "C C U UR RR"
-  // Reconstructs clean words
   text = text.replace(/([A-Za-z0-9])\s+\1(?!\w)/g, '$1');
-  
-  // 3. Fix words where every character got repeated twice (e.g. "EEnndd" -> "End")
   text = text.split(/\s+/).map(word => {
-    // If a word has repeated sequential pairs (e.g. "CCUURRRRIICCUULLUUMM")
     if (word.length > 4 && /([A-Za-z])\1([A-Za-z])\2/.test(word)) {
       return word.replace(/([A-Za-z])\1+/g, '$1');
     }
     return word;
   }).join(' ');
-
-  // 4. Normalize multiple spaces and line breaks
   return text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-// --- NLP TOKENIZER ---
 function tokenize(text) {
   if (!text) return [];
-  // Strip URLs and numbers before analyzing keywords
   const clean = text.replace(/https?:\/\/[^\s]+/gi, ' ').replace(/\b\d+\b/g, ' ');
   const tokens = clean.toLowerCase().match(/[a-z]+([\.\-\/][a-z]+)*/g) || [];
   return tokens.filter(t => !STOP_WORDS.has(t) && t.length > 2 && !/^\d+$/.test(t));
@@ -103,6 +89,114 @@ function extractNGrams(text) {
   return ngrams;
 }
 
+// --- SECTION PARSER: EXTRACTS REAL NAME, CONTACT & SECTIONS ---
+function parseResumeSections(rawText) {
+  const clean = cleanExtractedText(rawText);
+  const sections = {
+    name: "",
+    contact: "",
+    summary: "",
+    skills: "",
+    experience: "",
+    education: ""
+  };
+
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return sections;
+
+  // Real Name
+  if (lines[0] && lines[0].length < 40) {
+    sections.name = lines[0].replace(/[^a-zA-Z\s]/g, '').trim().toUpperCase();
+  }
+
+  // Real Contact Info
+  const contactLines = [];
+  for (let i = 1; i < Math.min(lines.length, 5); i++) {
+    const l = lines[i];
+    if (l.includes('@') || l.match(/\d{9,}/) || l.toLowerCase().includes('linkedin') || l.toLowerCase().includes('nigeria') || l.toLowerCase().includes('remote')) {
+      contactLines.push(l);
+    }
+  }
+  sections.contact = contactLines.join(' | ') || "Remote | Email Verified | LinkedIn Profile";
+
+  // Sections
+  let currentSec = 'summary';
+  const patterns = {
+    summary: /^(professional\s+)?summary|profile|about\s+me/i,
+    skills: /^(technical\s+)?skills|competencies|tools/i,
+    experience: /^(work\s+)?experience|employment|work\s+history|projects/i,
+    education: /^education|academic|qualifications|certifications/i
+  };
+
+  for (let i = contactLines.length + 1; i < lines.length; i++) {
+    const line = lines[i];
+    let isHeader = false;
+    for (const [key, regex] of Object.entries(patterns)) {
+      if (regex.test(line) && line.length < 35) {
+        currentSec = key;
+        isHeader = true;
+        break;
+      }
+    }
+    if (!isHeader) {
+      sections[currentSec] += line + "\n";
+    }
+  }
+
+  return sections;
+}
+
+// --- FILE UPLOADER (PDF, DOCX, TXT, OCR) ---
+async function processUploadedFile(file, onProgress) {
+  const fileName = file.name.toLowerCase();
+
+  if (file.type === 'text/plain' || fileName.endsWith('.txt')) {
+    return cleanExtractedText(await file.text());
+  }
+
+  if (fileName.endsWith('.pdf')) {
+    if (!window.pdfjsLib) throw new Error("PDF parser loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Reading PDF pages...");
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      let lastY, text = "";
+      for (const item of content.items) {
+        if (lastY === undefined || Math.abs(item.transform[5] - lastY) < 4) {
+          text += item.str;
+        } else {
+          text += "\n" + item.str;
+        }
+        lastY = item.transform[5];
+      }
+      fullText += text + "\n\n";
+    }
+    return cleanExtractedText(fullText);
+  }
+
+  if (fileName.endsWith('.docx')) {
+    if (!window.mammoth) throw new Error("Word parser loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Reading Word (.docx)...");
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    return cleanExtractedText(result.value);
+  }
+
+  if (file.type.startsWith('image/') || fileName.match(/\.(png|jpg|jpeg)$/)) {
+    if (!window.Tesseract) throw new Error("OCR engine loading... please wait 3 seconds.");
+    if (onProgress) onProgress("Running OCR on image (~5-10s)...");
+    const ret = await window.Tesseract.recognize(file, 'eng');
+    return cleanExtractedText(ret.data.text);
+  }
+
+  throw new Error("Unsupported format. Please upload PDF, Word (.docx), or Image.");
+}
+
+
 function extractJobKeywords(jobText) {
   const clean = cleanExtractedText(jobText);
   const rawTokens = tokenize(clean);
@@ -113,10 +207,8 @@ function extractJobKeywords(jobText) {
   const detectedHard = HARD_SKILLS.filter(s => ngrams.has(s) || clean.toLowerCase().includes(s));
   const detectedSoft = SOFT_SKILLS.filter(s => ngrams.has(s) || clean.toLowerCase().includes(s));
   const detectedVerbs = ACTION_VERBS.filter(v => ngrams.has(v));
-
   const classified = new Set([...detectedHard, ...detectedSoft, ...detectedVerbs]);
   
-  // Pull top keywords, rejecting pure numbers or web garbage
   const topDomain = Object.entries(freqMap)
     .filter(([w]) => !classified.has(w) && w.length > 3 && !STOP_WORDS.has(w))
     .sort((a, b) => b[1] - a[1])
@@ -149,10 +241,8 @@ function calculateMatch(jobKeywords, resumeText) {
 
   const totalCritical = jobKeywords.criticalKeywords.length || 1;
   const criticalScore = (matched.length / totalCritical) * 60;
-
   const matchedSoft = jobKeywords.softSkills.filter(s => resumeRaw.includes(s));
   const softScore = jobKeywords.softSkills.length ? (matchedSoft.length / jobKeywords.softSkills.length) * 25 : 25;
-
   const matchedVerbs = jobKeywords.actionVerbs.filter(v => resumeRaw.includes(v));
   const verbScore = jobKeywords.actionVerbs.length ? (matchedVerbs.length / jobKeywords.actionVerbs.length) * 15 : 15;
 
@@ -163,109 +253,68 @@ function calculateMatch(jobKeywords, resumeText) {
   };
 }
 
-// --- ACCURATE RESUME SECTION PARSER ---
-function parseResumeSections(rawText) {
-  const clean = cleanExtractedText(rawText);
-  const sections = {
-    contact: "",
-    summary: "",
-    skills: "",
-    experience: "",
-    education: ""
-  };
+// --- 🪄 1-CLICK TAILOR CV TO FIT DESCRIPTION ENGINE ---
+function tailorCVToFitDescription() {
+  const jd = document.getElementById('job-description-input').value.trim();
+  const resume = document.getElementById('resume-input').value.trim();
 
-  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-  let currentSec = 'contact';
+  if (!jd) {
+    alert("Please paste a Job Description first so we know what to tailor against!");
+    return;
+  }
 
-  const patterns = {
-    summary: /^(professional\s+)?summary|profile|about\s+me/i,
-    skills: /^(technical\s+)?skills|competencies|tools/i,
-    experience: /^(work\s+)?experience|employment|work\s+history/i,
-    education: /^education|academic|qualifications/i
-  };
+  const keywords = extractJobKeywords(jd);
+  const topHardSkills = keywords.hardSkills.slice(0, 6);
+  const topVerbs = keywords.actionVerbs.length >= 3 ? keywords.actionVerbs : ["engineered", "streamlined", "orchestrated", "automated"];
+  const critical = keywords.criticalKeywords.slice(0, 5);
 
-  lines.forEach((line, index) => {
-    // If we're at the top 3-4 lines and no header has triggered, it's contact/header info
-    if (index < 4 && currentSec === 'contact') {
-      sections.contact += line + " | ";
-      return;
-    }
+  const firstLine = jd.split('\n')[0].replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  const targetTitle = firstLine.length < 40 && firstLine.length > 5 ? firstLine : "Workflow & Technology Specialist";
 
-    let isHeader = false;
-    for (const [key, regex] of Object.entries(patterns)) {
-      if (regex.test(line) && line.length < 35) {
-        currentSec = key;
-        isHeader = true;
-        break;
-      }
-    }
+  const skillsList = topHardSkills.length ? topHardSkills.join(', ') : "process automation, workflow architecture, and API integration";
+  const tailoredSummary = `Results-oriented ${targetTitle} with proven expertise in ${skillsList}. Demonstrates a track record of bridging technical execution with strategic operations, specializing in end-to-end system design, workflow optimization, and high-impact digital problem-solving. Committed to delivering scalable, high-efficiency solutions tailored to organizational objectives.`;
 
-    if (!isHeader) {
-      if (currentSec === 'contact') currentSec = 'summary';
-      sections[currentSec] += line + "\n";
-    }
-  });
+  const coreTech = topHardSkills.length ? topHardSkills.map(s => s.toUpperCase()).join(' • ') : "ZAPIER • MAKE.COM • AIRTABLE • REST APIS";
+  const softCompetencies = keywords.softSkills.length ? keywords.softSkills.join(' • ') : "Cross-Functional Leadership • Agile Execution • Troubleshooting • Process Optimization";
+  const tailoredSkills = `• Core Technical Stack: ${coreTech}\n• Functional Competencies: System Architecture, Workflow Automation, Webhook Engineering, Database Modeling\n• Operational & Soft Skills: ${softCompetencies}`;
 
-  return sections;
+  const verb1 = (topVerbs[0] || "Engineered").toUpperCase();
+  const verb2 = (topVerbs[1] || "Automated").toUpperCase();
+  const verb3 = (topVerbs[2] || "Streamlined").toUpperCase();
+  const skill1 = critical[0] || "automation";
+  const skill2 = critical[1] || "workflow systems";
+  const skill3 = critical[2] || "API integrations";
+
+  const tailoredExperience = `
+<p class="font-bold text-slate-800">${targetTitle} | Professional Projects & Consulting</p>
+<p class="mt-1">• <strong>${verb1}</strong> robust ${skill1} pipelines and data architectures, reducing manual processing overhead by 45% while ensuring 99.8% execution accuracy.</p>
+<p class="mt-1">• <strong>${verb2}</strong> end-to-end ${skill2} and multi-system integrations to eliminate data silos and accelerate cross-functional delivery cycles by 3x.</p>
+<p class="mt-1">• <strong>${verb3}</strong> scalable ${skill3} frameworks, collaborating directly with stakeholders to translate business bottlenecks into automated, measurable workflows.</p>
+  `.trim();
+
+  document.getElementById('cv-summary-content').innerText = tailoredSummary;
+  document.getElementById('cv-skills-content').innerText = tailoredSkills;
+  document.getElementById('cv-experience-content').innerHTML = tailoredExperience;
+
+  lastExtractedKeywords = keywords;
+  document.getElementById('diagnostic-dashboard').classList.remove('hidden');
+  recalculateAndRender();
+
+  alert("🎉 Success! Your CV has been tailored to fit this exact role. Check your new match score below!");
 }
 
-// --- FILE EXTRACTOR WITH PROPER PDF KERNING MERGE ---
-async function processUploadedFile(file, onProgress) {
-  const fileName = file.name.toLowerCase();
-
-  // 1. TXT
-  if (file.type === 'text/plain' || fileName.endsWith('.txt')) {
-    return cleanExtractedText(await file.text());
-  }
-
-  // 2. PDF Document
-  if (fileName.endsWith('.pdf')) {
-    if (!window.pdfjsLib) throw new Error("PDF parser loading... please wait 3 seconds.");
-    if (onProgress) onProgress("Reading PDF pages...");
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      
-      // Combine text items smoothly without adding spaces between fragmented characters
-      let lastY, text = "";
-      for (const item of content.items) {
-        if (lastY === undefined || Math.abs(item.transform[5] - lastY) < 4) {
-          text += item.str;
-        } else {
-          text += "\n" + item.str;
-        }
-        lastY = item.transform[5];
-      }
-      fullText += text + "\n\n";
-    }
-    return cleanExtractedText(fullText);
-  }
-
-  // 3. Word Document (.docx)
-  if (fileName.endsWith('.docx')) {
-    if (!window.mammoth) throw new Error("Word parser loading... please wait 3 seconds.");
-    if (onProgress) onProgress("Reading Word (.docx)...");
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await window.mammoth.extractRawText({ arrayBuffer });
-    return cleanExtractedText(result.value);
-  }
-
-  // 4. Image OCR
-  if (file.type.startsWith('image/') || fileName.match(/\.(png|jpg|jpeg)$/)) {
-    if (!window.Tesseract) throw new Error("OCR engine loading... please wait 3 seconds.");
-    if (onProgress) onProgress("Running OCR on image (~5-10s)...");
-    const ret = await window.Tesseract.recognize(file, 'eng');
-    return cleanExtractedText(ret.data.text);
-  }
-
-  throw new Error("Unsupported format. Please upload PDF, Word (.docx), or Image.");
+// --- AUTO-UPDATE LIVE CV BUILDER (REPLACES SAMPLE WITH USER DATA) ---
+function updateCVEditor(rawText) {
+  if (!rawText || rawText.length < 20) return;
+  const parsed = parseResumeSections(rawText);
+  if (parsed.name) document.getElementById('cv-name').innerText = parsed.name;
+  if (parsed.contact) document.getElementById('cv-contact').innerText = parsed.contact;
+  if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary.trim();
+  if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills.trim();
+  if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience.trim();
+  if (parsed.education) document.getElementById('cv-education-content').innerText = parsed.education.trim();
 }
 
-// --- UI WIRING ---
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
   initFileUpload();
@@ -342,18 +391,18 @@ function initFileUpload() {
         if (resumeTextarea) resumeTextarea.value = extracted;
         if (progressBar) progressBar.classList.add('hidden');
 
-        // Automatically format sections in the Live CV Builder
-        const parsed = parseResumeSections(extracted);
-        if (parsed.summary) document.getElementById('cv-summary-content').innerText = parsed.summary.trim();
-        if (parsed.skills) document.getElementById('cv-skills-content').innerText = parsed.skills.trim();
-        if (parsed.experience) document.getElementById('cv-experience-content').innerText = parsed.experience.trim();
-        if (parsed.education) document.getElementById('cv-education-content').innerText = parsed.education.trim();
-
+        updateCVEditor(extracted);
         alert(`✅ Cleaned and loaded: ${file.name}`);
       } catch (err) {
         if (progressBar) progressBar.classList.add('hidden');
         alert(`Upload error: ${err.message}`);
       }
+    });
+  }
+
+  if (resumeTextarea) {
+    resumeTextarea.addEventListener('input', (e) => {
+      updateCVEditor(e.target.value.trim());
     });
   }
 }
@@ -384,6 +433,7 @@ function initTabs() {
 
 function initScanner() {
   const runBtn = document.getElementById('run-scanner-btn');
+  const autoTailorBtn = document.getElementById('auto-tailor-btn');
   const clearJd = document.getElementById('clear-jd-btn');
   const clearCv = document.getElementById('clear-cv-btn');
   const paywallModal = document.getElementById('paywall-modal');
@@ -393,6 +443,8 @@ function initScanner() {
   if (clearJd) clearJd.addEventListener('click', () => document.getElementById('job-description-input').value = '');
   if (clearCv) clearCv.addEventListener('click', () => document.getElementById('resume-input').value = '');
   if (closePaywall) closePaywall.addEventListener('click', () => paywallModal.classList.add('hidden'));
+
+  if (autoTailorBtn) autoTailorBtn.addEventListener('click', tailorCVToFitDescription);
 
   if (downloadPdf) {
     downloadPdf.addEventListener('click', () => {
@@ -411,13 +463,6 @@ function initScanner() {
         alert("Please paste a Job Description first.");
         return;
       }
-
-
-const autoTailorBtn = document.getElementById('auto-tailor-btn');
-  if (autoTailorBtn) {
-    autoTailorBtn.addEventListener('click', tailorCVToFitDescription);
-  }
-
 
       if (!consumeTrial()) {
         if (paywallModal) paywallModal.classList.remove('hidden');
@@ -471,7 +516,6 @@ function recalculateAndRender() {
 
   const result = calculateMatch(lastExtractedKeywords, liveCV);
 
-  // Score UI
   const scoreText = document.getElementById('match-score-text');
   if (scoreText) scoreText.innerText = `${result.score}%`;
 
@@ -486,7 +530,6 @@ function recalculateAndRender() {
     }
   }
 
-  // Missing Keywords (Click to Insert)
   const missingBox = document.getElementById('missing-keywords-container');
   if (missingBox) {
     document.getElementById('missing-count').innerText = result.missingKeywords.length;
@@ -512,7 +555,6 @@ function recalculateAndRender() {
     });
   }
 
-  // Matched Keywords
   const matchedBox = document.getElementById('matched-keywords-container');
   if (matchedBox) {
     document.getElementById('matched-count').innerText = result.matchedKeywords.length;
@@ -522,66 +564,4 @@ function recalculateAndRender() {
       </span>
     `).join('');
   }
-}
-
-
-// =========================================================
-// AI-STYLE PROCEDURAL CV TAILORING ENGINE
-// =========================================================
-function tailorCVToFitDescription() {
-  const jd = document.getElementById('job-description-input').value.trim();
-  const resume = document.getElementById('resume-input').value.trim();
-
-  if (!jd) {
-    alert("Please paste a Job Description first so we know what to tailor against!");
-    return;
-  }
-
-  // 1. Extract requirements & key verbs from the Job Description
-  const keywords = extractJobKeywords(jd);
-  const topHardSkills = keywords.hardSkills.slice(0, 6);
-  const topVerbs = keywords.actionVerbs.length >= 3 ? keywords.actionVerbs : ["engineered", "streamlined", "orchestrated", "automated"];
-  const critical = keywords.criticalKeywords.slice(0, 5);
-
-  // Inferred Job Title from JD
-  const firstLine = jd.split('\n')[0].replace(/[^a-zA-Z0-9\s]/g, '').trim();
-  const targetTitle = firstLine.length < 40 && firstLine.length > 5 ? firstLine : "Workflow & Technology Specialist";
-
-  // 2. Synthesize High-Impact Professional Summary
-  const skillsList = topHardSkills.length ? topHardSkills.join(', ') : "process automation, workflow architecture, and API integration";
-  const tailoredSummary = `Results-oriented ${targetTitle} with proven expertise in ${skillsList}. Demonstrates a track record of bridging technical execution with strategic operations, specializing in end-to-end system design, workflow optimization, and high-impact digital problem-solving. Committed to delivering scalable, high-efficiency solutions tailored to organizational objectives.`;
-
-  // 3. Re-organize Skills Matrix into Clean Professional Categories
-  const coreTech = topHardSkills.length ? topHardSkills.map(s => s.toUpperCase()).join(' • ') : "ZAPIER • MAKE.COM • AIRTABLE • REST APIS";
-  const softCompetencies = keywords.softSkills.length ? keywords.softSkills.join(' • ') : "Cross-Functional Leadership • Agile Execution • Troubleshooting • Process Optimization";
-  
-  const tailoredSkills = `• Core Technical Stack: ${coreTech}\n• Functional Competencies: System Architecture, Workflow Automation, Webhook Engineering, Database Modeling\n• Operational & Soft Skills: ${softCompetencies}`;
-
-  // 4. Construct Impact-Driven Experience Bullets (Google XYZ Formula)
-  const verb1 = (topVerbs[0] || "Engineered").toUpperCase();
-  const verb2 = (topVerbs[1] || "Automated").toUpperCase();
-  const verb3 = (topVerbs[2] || "Streamlined").toUpperCase();
-
-  const skill1 = critical[0] || "automation";
-  const skill2 = critical[1] || "workflow systems";
-  const skill3 = critical[2] || "API integrations";
-
-  const tailoredExperience = `
-<p class="font-bold text-slate-800">${targetTitle} | Professional Projects & Consulting</p>
-<p class="mt-1">• <strong>${verb1}</strong> robust ${skill1} pipelines and data architectures, reducing manual processing overhead by 45% while ensuring 99.8% execution accuracy.</p>
-<p class="mt-1">• <strong>${verb2}</strong> end-to-end ${skill2} and multi-system integrations to eliminate data silos and accelerate cross-functional delivery cycles by 3x.</p>
-<p class="mt-1">• <strong>${verb3}</strong> scalable ${skill3} frameworks, collaborating directly with stakeholders to translate business bottlenecks into automated, measurable workflows.</p>
-  `.trim();
-
-  // 5. Inject directly into the Live CV Tailor DOM
-  document.getElementById('cv-summary-content').innerText = tailoredSummary;
-  document.getElementById('cv-skills-content').innerText = tailoredSkills;
-  document.getElementById('cv-experience-content').innerHTML = tailoredExperience;
-
-  // 6. Recalculate score & light up green matched badges
-  lastExtractedKeywords = keywords;
-  document.getElementById('diagnostic-dashboard').classList.remove('hidden');
-  recalculateAndRender();
-
-  alert("🎉 Success! Your CV has been tailored to fit this exact role. Check your new match score below!");
 }
