@@ -1,0 +1,88 @@
+/* Screen UI Transitions */
+.tab-btn.active-tab {
+  color: #16a34a;
+  border-bottom-color: #16a34a;
+}
+
+.cv-editable-content[contenteditable="true"]:hover {
+  outline: 1px dashed #cbd5e1;
+}
+
+/* =========================================================
+   STRICT ATS PRINT STYLESHEET (@media print)
+   Standard: Pure 1-column, no tables, no background graphics,
+   strict black-on-white text for 100% parser compliance.
+   ========================================================= */
+@media print {
+  /* Hide all interactive app elements */
+  .no-print,
+  header,
+  nav,
+  #input-workspace,
+  #diagnostic-dashboard,
+  #paywall-modal,
+  #auth-modal,
+  button {
+    display: none !important;
+  }
+
+  body, main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+  }
+
+  #cv-tailor-section {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .printable-cv-document {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5in !important;
+  }
+
+  .printable-cv-document h1 {
+    font-size: 18pt !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4pt !important;
+    color: #000000 !important;
+  }
+
+  .printable-cv-document h2 {
+    font-size: 11pt !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    border-bottom: 1pt solid #000000 !important;
+    padding-bottom: 2pt !important;
+    margin-top: 10pt !important;
+    margin-bottom: 4pt !important;
+    color: #000000 !important;
+    page-break-after: avoid;
+  }
+
+  .printable-cv-document p, 
+  .printable-cv-document li {
+    font-size: 9.5pt !important;
+    color: #111111 !important;
+  }
+
+  /* Prevent page breaks inside job experience blocks */
+  .cv-section {
+    page-break-inside: avoid;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: #000000 !important;
+  }
+}
